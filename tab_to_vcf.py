@@ -8,6 +8,7 @@ import vcf
 from vcf.model import _Record
 
 
+TEMPLATE_VCF_FILE = "template-4.1.vcf"
 VCF_TO_FIELDS = (
     ("#CHROM", "Chrom"),
     ("POS", "Pos(hg19)"),
