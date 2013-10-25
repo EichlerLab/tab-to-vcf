@@ -26,6 +26,10 @@ def tab_to_vcf(input_file, output_file):
     Convert tab-delimited file to VCF.
 
     Support for the fixed VCF fields: #CHROM, POS, ID, REF, ALT, QUAL, FILTER, INFO
+
+    PyVCF's _Record class requires the following arguments:
+
+    CHROM, POS, ID, REF, ALT, QUAL, FILTER, INFO, FORMAT, sample_indexes
     """
     with open(input_file, "r") as input_fh:
         reader = csv.DictReader(input_fh, delimiter="\t")
