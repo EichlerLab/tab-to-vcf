@@ -43,8 +43,13 @@ def tab_to_vcf(input_file, output_file):
                 for row in reader:
                     args = [row.get(tab_field, ".")
                             for vcf_field, tab_field in VCF_TO_FIELDS]
+
+                    # Convert position to an integer.
                     args[1] = int(args[1])
-                    args.append([])
+
+                    # Add empty entries for FORMAT and sample_indexes.
+                    args.extend([".", []])
+
                     record = _Record(*args)
                     vcf_writer.write_record(record)
 
