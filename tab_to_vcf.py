@@ -16,8 +16,7 @@ VCF_TO_FIELDS = (
     ("REF", "Ref"),
     ("ALT", "Allele"),
     ("QUAL", "QUAL"),
-    ("FILTER", "FILTER"),
-    ("INFO", "INFO")
+    ("FILTER", "FILTER")
 )
 
 
@@ -49,6 +48,9 @@ def tab_to_vcf(input_file, output_file):
 
                     # Add empty entries for FORMAT and sample_indexes.
                     args.extend([".", []])
+
+                    # Add empty entries for INFO, FORMAT, and sample_indexes.
+                    args.extend([{}, ".", []])
 
                     record = _Record(*args)
                     vcf_writer.write_record(record)
