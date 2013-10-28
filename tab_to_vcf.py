@@ -18,6 +18,8 @@ VCF_TO_FIELDS = (
     ("QUAL", "QUAL"),
     ("FILTER", "FILTER")
 )
+POSITION_INDEX=1
+ALT_INDEX=4
 
 
 def tab_to_vcf(input_file, output_file):
@@ -44,10 +46,10 @@ def tab_to_vcf(input_file, output_file):
                             for vcf_field, tab_field in VCF_TO_FIELDS]
 
                     # Convert position to an integer.
-                    args[1] = int(args[1])
+                    args[POSITION_INDEX] = int(args[POSITION_INDEX])
 
-                    # Add empty entries for FORMAT and sample_indexes.
-                    args.extend([".", []])
+                    # Convert alternate allele scalar to a list.
+                    args[ALT_INDEX] = [args[ALT_INDEX]]
 
                     # Add empty entries for INFO, FORMAT, and sample_indexes.
                     args.extend([{}, ".", []])
