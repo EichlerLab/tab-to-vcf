@@ -3,6 +3,7 @@
 Convert the given tab-delimited document into a VCF 4.1 document for annotation with Seattle Seq.
 """
 import argparse
+from Bio import SeqIO
 import csv
 import vcf
 from vcf.model import _Record
@@ -18,11 +19,58 @@ VCF_TO_FIELDS = (
     ("QUAL", "QUAL"),
     ("FILTER", "FILTER")
 )
+CHROMOSOME_INDEX=0
 POSITION_INDEX=1
+REF_INDEX=3
 ALT_INDEX=4
 
 
-def tab_to_vcf(input_file, output_file):
+def get_sequence(reference_dict, chrom, position, variant_length, one_base=True):
+    chrom = str(chrom).lower().lstrip("chr")
+    position = int(position)
+    variant_length = int(variant_length)
+    if one_base:
+        position = position - 1
+
+    return reference_dict[chrom][position:position+variant_length].upper().seq.tostring()
+
+
+def gatk_indel_to_vcf(vcf_row, reference_dict):
+    """
+    Convert the given indel from GATK format to VCF 4.1 standard. For example,
+    the following lines should be converted from:
+
+    2       60689253        1720    *       +G      .       .       .       .
+    21      38877833        1721    *       -C      .       .       .       .
+    21      47958429        1722    *       +CTGGTCT        .       .       .       .
+
+    to:
+
+    2       60689253        1720    A       AG      .       .       .       .
+    21      38877833        1721    GC      G       .       .       .       .
+    21      47958429        1722    A       ACTGGTCT        .       .       .       .
+
+    >>> reference_dict = SeqIO.index("chr2", "fasta")
+    >>> gatk_indel_to_vcf(['2', 60689253, '1720', '*', '+G', '.', '.', '.', '.'], reference_dict)
+    ['2', 60689253, '1720', 'A', 'AG', '.', '.', '.', '.']
+    """
+    # Load the base at the given position.
+    variant_size = 1
+    reference_base = get_sequence(reference_dict, vcf_row[CHROMOSOME_INDEX], vcf_row[POSITION_INDEX], variant_size)
+
+    # Create a new reference allele based on the event type (the position's base
+    # for insertions, the position base plus the deleted base(s) for deletions).
+    vcf_row[REF_INDEX] = reference_base
+
+    # Create a new alternate allele based on the event type (the position's base
+    # plus the inserted base(s) for insertions, the position's base for
+    # deletions).
+    vcf_row[ALT_INDEX] = vcf_row[ALT_INDEX].replace("+", reference_base)
+
+    return vcf_row
+
+
+def tab_to_vcf(input_file, output_file, reference_file):
     """
     Convert tab-delimited file to VCF.
 
@@ -32,6 +80,8 @@ def tab_to_vcf(input_file, output_file):
 
     CHROM, POS, ID, REF, ALT, QUAL, FILTER, INFO, FORMAT, sample_indexes
     """
+    reference_dict = SeqIO.to_dict(SeqIO.parse(reference_file, "fasta"))
+
     with open(input_file, "r") as input_fh:
         reader = csv.DictReader(input_fh, delimiter="\t")
 
