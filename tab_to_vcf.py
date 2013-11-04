@@ -55,7 +55,7 @@ def gatk_indel_to_vcf(vcf_row, reference_dict):
     ['2', 60689253, '1720', 'A', 'AG', '.', '.', '.', '.']
     """
     # Load the base at the given position.
-    variant_size = 1
+    variant_size = len(vcf_row[ALT_INDEX].lstrip("+-"))
     reference_base = get_sequence(reference_dict, vcf_row[CHROMOSOME_INDEX], vcf_row[POSITION_INDEX], variant_size)
 
     # Create a new reference allele based on the event type (the position's base
