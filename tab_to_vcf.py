@@ -62,6 +62,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("input_file", help="tab-delimited input")
     parser.add_argument("output_file", help="VCF 4.1 output")
+    parser.add_argument("reference_file", help="reference assembly for variants in a single FASTA file")
     args = parser.parse_args()
 
-    tab_to_vcf(args.input_file, args.output_file)
+    tab_to_vcf(args.input_file, args.output_file, args.reference_file)
