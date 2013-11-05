@@ -26,7 +26,6 @@ ALT_INDEX=4
 
 
 def get_sequence(reference_dict, chrom, position, one_base=True):
-    chrom = "chr" + str(chrom)
     position = int(position)
     if one_base:
         position = position - 1
