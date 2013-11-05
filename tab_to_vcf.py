@@ -25,14 +25,13 @@ REF_INDEX=3
 ALT_INDEX=4
 
 
-def get_sequence(reference_dict, chrom, position, variant_length, one_base=True):
-    chrom = str(chrom).lower().lstrip("chr")
+def get_sequence(reference_dict, chrom, position, one_base=True):
+    chrom = "chr" + str(chrom)
     position = int(position)
-    variant_length = int(variant_length)
     if one_base:
         position = position - 1
 
-    return reference_dict[chrom][position:position+variant_length].upper().seq.tostring()
+    return reference_dict[chrom][position:position + 1].upper().seq.tostring()
 
 
 def gatk_indel_to_vcf(vcf_row, reference_dict):
@@ -55,8 +54,7 @@ def gatk_indel_to_vcf(vcf_row, reference_dict):
     ['2', 60689253, '1720', 'A', 'AG', '.', '.', '.', '.']
     """
     # Load the base at the given position.
-    variant_size = len(vcf_row[ALT_INDEX].lstrip("+-"))
-    reference_base = get_sequence(reference_dict, vcf_row[CHROMOSOME_INDEX], vcf_row[POSITION_INDEX], variant_size)
+    reference_base = get_sequence(reference_dict, vcf_row[CHROMOSOME_INDEX], vcf_row[POSITION_INDEX])
 
     # Create a new reference allele based on the event type (the position's base
     # for insertions, the position base plus the deleted base(s) for deletions).
