@@ -100,6 +100,10 @@ def tab_to_vcf(input_file, output_file, reference_file):
                     # Convert position to an integer.
                     args[POSITION_INDEX] = int(args[POSITION_INDEX])
 
+                    # Convert indels from GATK to VCF format.
+                    if args[ALT_INDEX].startswith(("+", "-")) and not "/" in args[ALT_INDEX]:
+                        args = gatk_indel_to_vcf(args, reference_dict)
+
                     # Convert alternate allele scalar to a list.
                     args[ALT_INDEX] = [args[ALT_INDEX]]
 
