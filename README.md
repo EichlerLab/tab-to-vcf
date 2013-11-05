@@ -11,6 +11,7 @@ Install
     virtualenv vcf
     source vcf/bin/activate
     pip install -r requirements.txt
+    pip install -e git+https://github.com/brentp/fastahack-python.git#egg=fastahack-python
 
 Run
 ---
