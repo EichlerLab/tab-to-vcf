@@ -3,7 +3,7 @@
 Convert the given tab-delimited document into a VCF 4.1 document for annotation with Seattle Seq.
 """
 import argparse
-from Bio import SeqIO
+from fastahack import FastaHack
 import csv
 import vcf
 from vcf.model import _Record
@@ -25,12 +25,9 @@ REF_INDEX=3
 ALT_INDEX=4
 
 
-def get_sequence(reference_dict, chrom, position, one_base=True):
+def get_sequence(reference_dict, chrom, position):
     position = int(position)
-    if one_base:
-        position = position - 1
-
-    return reference_dict[chrom][position:position + 1].upper().seq.tostring()
+    return reference_dict["%s:%s-%s" % (chrom, position, position)].upper()
 
 
 def gatk_indel_to_vcf(vcf_row, reference_dict):
@@ -48,7 +45,7 @@ def gatk_indel_to_vcf(vcf_row, reference_dict):
     21      38877833        1721    GC      G       .       .       .       .
     21      47958429        1722    A       ACTGGTCT        .       .       .       .
 
-    >>> reference_dict = SeqIO.index("ucsc.hg19.fasta", "fasta")
+    >>> reference_dict = FastaHack("ucsc.hg19.fasta")
     >>> gatk_indel_to_vcf(['chr2', 60689253, '1720', '*', '+G', '.', '.', '.', '.'], reference_dict)
     ['chr2', 60689253, '1720', 'A', 'AG', '.', '.', '.', '.']
     >>> gatk_indel_to_vcf(['chr21', 38877833, '1721', '*', '-C', '.', '.', '.', '.'], reference_dict)
@@ -85,7 +82,7 @@ def tab_to_vcf(input_file, output_file, reference_file):
 
     CHROM, POS, ID, REF, ALT, QUAL, FILTER, INFO, FORMAT, sample_indexes
     """
-    reference_dict = SeqIO.to_dict(SeqIO.parse(reference_file, "fasta"))
+    reference_dict = FastaHack(reference_file)
 
     with open(input_file, "r") as input_fh:
         reader = csv.DictReader(input_fh, delimiter="\t")
