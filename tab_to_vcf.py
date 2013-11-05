@@ -3,8 +3,8 @@
 Convert the given tab-delimited document into a VCF 4.1 document for annotation with Seattle Seq.
 """
 import argparse
-from fastahack import FastaHack
 import csv
+from fastahack import FastaHack
 import vcf
 from vcf.model import _Record
 
