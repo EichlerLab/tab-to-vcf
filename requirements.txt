@@ -3,3 +3,4 @@ PyVCF==0.6.4
 distribute==0.7.3
 fastahack==0.1
 ipython==1.1.0
+-e git+https://github.com/brentp/fastahack-python.git@00fd0b6ee920f49f26df1c92f924bc2dc4124e74#egg=fastahack-master
