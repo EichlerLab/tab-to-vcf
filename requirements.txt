@@ -1,0 +1,5 @@
+Cython==0.19.2
+PyVCF==0.6.4
+distribute==0.7.3
+fastahack==0.1
+ipython==1.1.0
