@@ -58,12 +58,16 @@ def gatk_indel_to_vcf(vcf_row, reference_dict):
 
     # Create a new reference allele based on the event type (the position's base
     # for insertions, the position base plus the deleted base(s) for deletions).
-    vcf_row[REF_INDEX] = reference_base
 
     # Create a new alternate allele based on the event type (the position's base
     # plus the inserted base(s) for insertions, the position's base for
     # deletions).
-    vcf_row[ALT_INDEX] = vcf_row[ALT_INDEX].replace("+", reference_base)
+    if vcf_row[ALT_INDEX].startswith("+"):
+        vcf_row[REF_INDEX] = reference_base
+        vcf_row[ALT_INDEX] = vcf_row[ALT_INDEX].replace("+", reference_base)
+    elif vcf_row[ALT_INDEX].startswith("-"):
+        vcf_row[REF_INDEX] = "%s%s" % (reference_base, vcf_row[ALT_INDEX].lstrip("-"))
+        vcf_row[ALT_INDEX] = reference_base
 
     return vcf_row
 
