@@ -48,9 +48,13 @@ def gatk_indel_to_vcf(vcf_row, reference_dict):
     21      38877833        1721    GC      G       .       .       .       .
     21      47958429        1722    A       ACTGGTCT        .       .       .       .
 
-    >>> reference_dict = SeqIO.index("chr2", "fasta")
-    >>> gatk_indel_to_vcf(['2', 60689253, '1720', '*', '+G', '.', '.', '.', '.'], reference_dict)
-    ['2', 60689253, '1720', 'A', 'AG', '.', '.', '.', '.']
+    >>> reference_dict = SeqIO.index("ucsc.hg19.fasta", "fasta")
+    >>> gatk_indel_to_vcf(['chr2', 60689253, '1720', '*', '+G', '.', '.', '.', '.'], reference_dict)
+    ['chr2', 60689253, '1720', 'A', 'AG', '.', '.', '.', '.']
+    >>> gatk_indel_to_vcf(['chr21', 38877833, '1721', '*', '-C', '.', '.', '.', '.'], reference_dict)
+    ['chr21', 38877833, '1721', 'GC', 'G', '.', '.', '.', '.']
+    >>> gatk_indel_to_vcf(['chr21', 47958429, '1722', '*', '+CTGGTCT', '.', '.', '.', '.'], reference_dict)
+    ['chr21', 47958429, '1722', 'A', 'ACTGGTCT', '.', '.', '.', '.']
     """
     # Load the base at the given position.
     reference_base = get_sequence(reference_dict, vcf_row[CHROMOSOME_INDEX], vcf_row[POSITION_INDEX])
