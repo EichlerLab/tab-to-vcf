@@ -24,6 +24,21 @@ POSITION_INDEX=1
 REF_INDEX=3
 ALT_INDEX=4
 
+# each pair here represents a REF==>ALT mapping
+# For example, IUPAC "R":
+#   REF      ALT
+#   A   -->  G
+#   G   -->  A
+
+IUPAC_CODES = {
+    "R": {"A":"G", "G":"A"},
+    "Y": {"C":"T", "T":"C"},
+    "S": {"G":"C", "C":"G"},
+    "W": {"A":"T", "T":"A"},
+    "K": {"G":"T", "T":"G"},
+    "M": {"A":"C", "C":"A"},
+}
+
 
 def get_sequence(reference_dict, chrom, position):
     position = int(position)
@@ -72,7 +87,25 @@ def gatk_indel_to_vcf(vcf_row, reference_dict):
     return vcf_row
 
 
-def tab_to_vcf(input_file, output_file, reference_file):
+def convert_iupac(vcf_row):
+    """
+    Convert a REF/ALT genotype, where the ALT is an IUPAC code
+    Does not support triallelic iupac codes. Errors print warning and return input
+    >>> convert_iupac(['21', 47958429, '1722', 'T', 'W', '.', '.', '.', '.'])
+    ['21', 47958429, '1722', 'T', 'A', '.', '.', '.', '.']
+    """
+    if vcf_row[ALT_INDEX] in IUPAC_CODES.keys():
+        try:
+            vcf_row[ALT_INDEX] = IUPAC_CODES[vcf_row[ALT_INDEX]][vcf_row[REF_INDEX]]
+        except KeyError:
+            print "WARNING: could not convert IUPAC code (triallelic, malformed or other?) for row:"
+            print "\t".join(vcf_row)
+        finally:
+            return vcf_row
+    else:
+        return vcf_row
+
+def tab_to_vcf(input_file, output_file, reference_file, convert_iupac=False):
     """
     Convert tab-delimited file to VCF.
 
@@ -81,6 +114,11 @@ def tab_to_vcf(input_file, output_file, reference_file):
     PyVCF's _Record class requires the following arguments:
 
     CHROM, POS, ID, REF, ALT, QUAL, FILTER, INFO, FORMAT, sample_indexes
+
+    convert_iupac (bool) : When present, convert IUPAC codes to the non-reference allele.
+        This is only possible for when the reference and IUPAC-determined alternates share 
+        at least one allele. Tri-allelic conversion is not supported and will emit a warning.
+        IUPAC codes: http://www.bioinformatics.org/sms/iupac.html
     """
     reference_dict = FastaHack(reference_file)
 
@@ -104,6 +142,9 @@ def tab_to_vcf(input_file, output_file, reference_file):
                     if args[ALT_INDEX].startswith(("+", "-")) and not "/" in args[ALT_INDEX]:
                         args = gatk_indel_to_vcf(args, reference_dict)
 
+                    # Optionally convert IUPAC code
+                    if convert_iupac:
+                        args = convert_iupac(args)
                     # Convert alternate allele scalar to a list.
                     args[ALT_INDEX] = [args[ALT_INDEX]]
 
@@ -119,6 +160,8 @@ if __name__ == "__main__":
     parser.add_argument("input_file", help="tab-delimited input")
     parser.add_argument("output_file", help="VCF 4.1 output")
     parser.add_argument("reference_file", help="reference assembly for variants in a single FASTA file")
+    parser.add_argument("--convert-iupac", help="Convert IUPAC codes to alternate allele only", 
+        required=False, default=False, type=bool, action="store_true")
     args = parser.parse_args()
 
-    tab_to_vcf(args.input_file, args.output_file, args.reference_file)
+    tab_to_vcf(args.input_file, args.output_file, args.reference_file, convert_iupac=args.convert_iupac)
