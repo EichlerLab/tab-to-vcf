@@ -161,7 +161,7 @@ if __name__ == "__main__":
     parser.add_argument("output_file", help="VCF 4.1 output")
     parser.add_argument("reference_file", help="reference assembly for variants in a single FASTA file")
     parser.add_argument("--convert-iupac", help="Convert IUPAC codes to alternate allele only", 
-        required=False, default=False, type=bool, action="store_true")
+        required=False, default=False, action="store_true")
     args = parser.parse_args()
 
     tab_to_vcf(args.input_file, args.output_file, args.reference_file, convert_iupac=args.convert_iupac)
