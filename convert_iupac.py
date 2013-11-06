@@ -1,4 +1,5 @@
 import pandas as pd
+import argparse
 from cStringIO import StringIO
 
 
@@ -35,7 +36,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("input_file", help="tab-delimited input")
     parser.add_argument("output_file", help="VCF 4.1 output")
-    
+    args = parser.parse_args()
     vcf, header = read_vcf(args.input_file,
         columns=["#CHROM","POS","ID","REF","ALT","QUAL","FILTER","INFO","FORMAT"])
     vcf["ALT"] = map(lambda x: convert_iupac(x[1]), vcf.iterrows())
