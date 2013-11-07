@@ -148,7 +148,7 @@ def tab_to_vcf(input_file, output_file, reference_file, convert_iupac=False, inf
                     # Convert alternate allele scalar to a list.
                     args[ALT_INDEX] = [args[ALT_INDEX]]
                     if info_fields:
-                        for k,v in info_fields:
+                        for k,v in info_fields.items():
                             if v in row:
                                 INFO[k] = row[v]
                     else:
