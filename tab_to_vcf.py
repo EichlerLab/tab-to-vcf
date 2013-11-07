@@ -134,7 +134,6 @@ def tab_to_vcf(input_file, output_file, reference_file, convert_iupac=False):
                 for row in reader:
                     args = [row.get(tab_field, ".")
                             for vcf_field, tab_field in VCF_TO_FIELDS]
-
                     # Convert position to an integer.
                     args[POSITION_INDEX] = int(args[POSITION_INDEX])
 
@@ -145,11 +144,15 @@ def tab_to_vcf(input_file, output_file, reference_file, convert_iupac=False):
                     # Optionally convert IUPAC code
                     if convert_iupac:
                         args = convert_iupac(args)
+
                     # Convert alternate allele scalar to a list.
                     args[ALT_INDEX] = [args[ALT_INDEX]]
-
+                    if args.sample_id_field:
+                        INFO = {"SAMPLES": row.get(args.sample_id_field, "unknown")}
+                    else:
+                        INFO = {}
                     # Add empty entries for INFO, FORMAT, and sample_indexes.
-                    args.extend([{}, ".", []])
+                    args.extend([INFO, ".", []])
 
                     record = _Record(*args)
                     vcf_writer.write_record(record)
@@ -162,6 +165,8 @@ if __name__ == "__main__":
     parser.add_argument("reference_file", help="reference assembly for variants in a single FASTA file")
     parser.add_argument("--convert-iupac", help="Convert IUPAC codes to alternate allele only", 
         required=False, default=False, action="store_true")
+    parser.add_argument("--sample-id-field", help="Name of column for adding optional SAMPLES= to INFO vcf field", 
+        required=False, default=None)
     args = parser.parse_args()
 
     tab_to_vcf(args.input_file, args.output_file, args.reference_file, convert_iupac=args.convert_iupac)
