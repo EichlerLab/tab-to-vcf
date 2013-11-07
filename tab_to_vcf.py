@@ -105,7 +105,7 @@ def convert_iupac(vcf_row):
     else:
         return vcf_row
 
-def tab_to_vcf(input_file, output_file, reference_file, convert_iupac=False, sample_field=None):
+def tab_to_vcf(input_file, output_file, reference_file, convert_iupac=False, INFO_FIELDS=None):
     """
     Convert tab-delimited file to VCF.
 
@@ -147,8 +147,10 @@ def tab_to_vcf(input_file, output_file, reference_file, convert_iupac=False, sam
 
                     # Convert alternate allele scalar to a list.
                     args[ALT_INDEX] = [args[ALT_INDEX]]
-                    if sample_field:
-                        INFO = {"SAMPLES": row.get(sample_field, "unknown")}
+                    if INFO_FIELDS:
+                        for k,v in INFO_FIELDS:
+                            if v in row:
+                                INFO[k] = row[v]
                     else:
                         INFO = {}
                     # Add empty entries for INFO, FORMAT, and sample_indexes.
@@ -167,6 +169,15 @@ if __name__ == "__main__":
         required=False, default=False, action="store_true")
     parser.add_argument("--sample-id-field", help="Name of column for adding optional SAMPLES= to INFO vcf field", 
         required=False, default=None)
+    parser.add_argument("--info-fields", help="input:ouput (comma separated) mapping for INFO field", 
+        required=False, default=None)
+    
     args = parser.parse_args()
+    if args.info_fields:
+        INFO_FIELDS = {}
+        mapping = args.info_fields.split(",")
+        for m in mapping:
+            k,v = m.strip(" ").split(":")
+            INFO_FIELDS[k] = v
 
-    tab_to_vcf(args.input_file, args.output_file, args.reference_file, convert_iupac=args.convert_iupac, sample_field=args.sample_id_field)
+    tab_to_vcf(args.input_file, args.output_file, args.reference_file, convert_iupac=args.convert_iupac, info_fields=INFO_FIELDS)
