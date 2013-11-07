@@ -148,7 +148,7 @@ def tab_to_vcf(input_file, output_file, reference_file, convert_iupac=False, sam
                     # Convert alternate allele scalar to a list.
                     args[ALT_INDEX] = [args[ALT_INDEX]]
                     if sample_field:
-                        INFO = {"SAMPLES": row.get(args.sample_id_field, "unknown")}
+                        INFO = {"SAMPLES": row.get(sample_field, "unknown")}
                     else:
                         INFO = {}
                     # Add empty entries for INFO, FORMAT, and sample_indexes.
