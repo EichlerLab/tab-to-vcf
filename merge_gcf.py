@@ -4,13 +4,16 @@ from cStringIO import StringIO
 import difflib
 
 def read_vcf(vcf_filename, columns=None):
-    columns = columns or ["CHROM","POS","ID","REF","ALT","QUAL","FILTER","INFO","FORMAT","DATA"]
+    #columns = columns or ["CHROM","POS","ID","REF","ALT","QUAL","FILTER","INFO","FORMAT","DATA"]
     s = StringIO()
     vcf_header_lines = ""
     with open(vcf_filename) as f:
         for line in f:
             if line.startswith('#'):
-                vcf_header_lines += line
+        	if line.startswith('#'):
+     	           if line.startswith('#CHROM'):
+                       columns = line.lstrip("#").split()
+	        vcf_header_lines += line
             else:
                 s.write(line)
     s.seek(0)
@@ -18,11 +21,11 @@ def read_vcf(vcf_filename, columns=None):
     return df, vcf_header_lines
 
 def extract_info_field(info_field):
-    info_field = info_field.split(";")
+    info_field = info_field.rstrip(";").split(";") or []
     out = {}
     for i in info_field:
         k,v = i.split("=")
-        out[k] = v
+	out[k] = v
     return out
 
 if __name__ == '__main__':
