@@ -105,7 +105,7 @@ def convert_iupac(vcf_row):
     else:
         return vcf_row
 
-def tab_to_vcf(input_file, output_file, reference_file, convert_iupac=False):
+def tab_to_vcf(input_file, output_file, reference_file, convert_iupac=False, sample_field=None):
     """
     Convert tab-delimited file to VCF.
 
