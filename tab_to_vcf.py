@@ -4,12 +4,13 @@ Convert the given tab-delimited document into a VCF 4.1 document for annotation 
 """
 import argparse
 import csv
+import os
 from fastahack import FastaHack
 import vcf
 from vcf.model import _Record
 
 
-TEMPLATE_VCF_FILE = "template-4.1.vcf"
+TEMPLATE_VCF_FILE = os.path.join(os.path.dirname(__file__), "template-4.1.vcf")
 VCF_TO_FIELDS = (
     ("#CHROM", "Chrom"),
     ("POS", "Pos(hg19)"),
@@ -87,7 +88,7 @@ def gatk_indel_to_vcf(vcf_row, reference_dict):
     return vcf_row
 
 
-def convert_iupac(vcf_row):
+def _convert_iupac(vcf_row):
     """
     Convert a REF/ALT genotype, where the ALT is an IUPAC code
     Does not support triallelic iupac codes. Errors print warning and return input
@@ -143,15 +144,15 @@ def tab_to_vcf(input_file, output_file, reference_file, convert_iupac=False, inf
 
                     # Optionally convert IUPAC code
                     if convert_iupac:
-                        args = convert_iupac(args)
+                        args = _convert_iupac(args)
 
                     # Convert alternate allele scalar to a list.
                     args[ALT_INDEX] = [args[ALT_INDEX]]
                     if info_fields:
                         INFO = {}
                         for k,v in info_fields.items():
-                            if v in row:
-                                INFO[k] = row[v]
+                            if k in row:
+                                INFO[v] = row[k]
                     else:
                         INFO = {}
                     # Add empty entries for INFO, FORMAT, and sample_indexes.
@@ -168,8 +169,6 @@ if __name__ == "__main__":
     parser.add_argument("reference_file", help="reference assembly for variants in a single FASTA file")
     parser.add_argument("--convert-iupac", help="Convert IUPAC codes to alternate allele only", 
         required=False, default=False, action="store_true")
-    parser.add_argument("--sample-id-field", help="Name of column for adding optional SAMPLES= to INFO vcf field", 
-        required=False, default=None)
     parser.add_argument("--info-fields", help="input:ouput (comma separated) mapping for INFO field", 
         required=False, default=None)
     
