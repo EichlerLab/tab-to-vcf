@@ -2,6 +2,7 @@ import pandas as pd
 import argparse
 from cStringIO import StringIO
 import difflib
+import yaml
 
 def read_vcf(vcf_filename, columns=None):
     columns = None
@@ -31,9 +32,51 @@ def extract_info_field(info_field):
 def parse_config(config, args):
     args.merge_keys = config.get("merge").get("keys") or args.merge_keys
     args.ignore_fields = config.get("merge").get("ignore") or args.ignore_fields
-    args.info_fields = filter(lambda x: x.startswith("INFO"), config.get("rules").keys())
+    args.info_fields = [] #map(lambda x: x.lstrip("INFO."), filter(lambda x: x.startswith("INFO"), config.get("rules").keys()))
+    for rule in config.get("rules"):
+        if rule.keys()[0].startswith("INFO."):
+            args.info_fields.append(rule.keys()[0].lstrip("INFO."))
     rules = config.get("rules", None)
     return args, rules
+
+def compare_rule_kw(kw, kw_list):
+    if kw_list == "*":
+        return 0
+    else:
+        try:
+            return kw_list.index(kw)
+        except ValueError:
+            return None
+
+def apply_rule(a, b, rule):
+    rule_name = rule.keys()[0]
+    rule = rule[rule_name]
+    short_rule_name = rule_name.lstrip("INFO.")
+    for r in rule["order"]:
+        a_ix = compare_rule_kw(a[short_rule_name], rule[r])
+        b_ix = compare_rule_kw(b[short_rule_name], rule[r])
+        if r == "accept":
+            if a_ix is None and b_ix is None:
+                continue    
+            elif a_ix >= b_ix:
+                return [a], True
+            elif b_ix > a_ix:
+                return [b], True
+            else:
+                # accept kw not found, continue on
+                continue
+        elif r == "reject":
+            if (a_ix is not None) or (b_ix is not None):
+                # reject kw triggered in either row
+                # do not merge and return both
+                return [a, b], True
+            else:
+                # reject kw not found, continue on
+                continue
+        else:
+            Exception("unknown rule!")
+    # no rules applied, return both
+    return [a,b], False
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -55,8 +98,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
     rules = None
     if args.config:
-         args, rules = parse_config(yaml.parse(open(args.config,'r')), args)
+        args, rules = parse_config(yaml.load(open(args.config,'r')), args)
 
+    rule_list = map(lambda x: x.keys()[0], rules)
+    
     # Load each vcf
     vcf_a, _, vcf_columns_a = read_vcf(args.vcf_a)
     vcf_b, _, vcf_columns_b = read_vcf(args.vcf_b)
@@ -85,7 +130,7 @@ if __name__ == '__main__':
 
     # drop all exact duplicates
     vcf = vcf.drop_duplicates()
-
+    
     # find duplicated rows based on Chrom, Pos, Alt and Sample
     # this could be made more or less strict 
     grouped_vcf = vcf.groupby(args.merge_keys)
@@ -100,23 +145,48 @@ if __name__ == '__main__':
     for cnt, g in grouped_vcf:
         if len(g) == 1:
             # Simple case-- nothing to resolve (unique record)
-            out.append(g)
+            out.append(g.ix[g.index[0]])
         elif len(g) == 2:
             a = g[cols].values[0]
             b = g[cols].values[1]
             matcher = difflib.SequenceMatcher(lambda x: x in cols, a, b)
             resolve_rows = ""
+            resolve_fields = []
             for tag, i1, i2, j1, j2 in matcher.get_opcodes(): 
                 if tag != "equal":
-                    # TODO: Apply rules here if available to resolve if possible
-                    if cols[i1] in rules:
-
+                    resolve_rows += "%s\tRow 1:%s\n\tRow 2:%s\n" % (cols[i1], a[i1:i2][0],b[j1:j2][0])
+                    if cols[i1] in args.info_fields:
+                        resolve_fields.append("INFO." + cols[i1])
                     else:
-                        resolve_rows += "%s\tRow 1:%s\n\tRow 2:%s\n" % (cols[i1], a[i1:i2][0],b[j1:j2][0])
-
+                        resolve_fields.append(cols[i1])
+            rule_success = False
             if resolve_rows != "":
-                to_resolve.append(g)
-                if not args.silent:
+                # Apply rules here if available to resolve if possible
+                for field in resolve_fields:
+                    if field in rule_list:
+                        rule = rules[rule_list.index(field)]
+                        c, s = apply_rule(g.ix[g.index[0]][cols], g.ix[g.index[1]][cols], rule=rule)
+                        if s == False:
+                            continue
+                        else:
+                            if len(c) == 1:
+                                # successfully resolved fields
+                                out.append(g.ix[c[0].name])
+                                rule_success = True
+                                resolved = True
+                                break
+                            elif len(c) == 2:
+                                to_resolve.append(g)
+                                #to_resolve.append(c[1])
+                                rule_success = True
+                                resolved = False
+                                break
+                            else:
+                                raise Exception("Rule ERROR")
+                if not rule_success:
+                    to_resolve.append(g)
+                    resolved=False
+                if not resolved and not args.silent:
                     print "=========" * 10
                     print "\t" + "\t".join(cols)
                     print "Row 1:\t" + "\t".join([str(x) for x in a])
@@ -124,7 +194,7 @@ if __name__ == '__main__':
                     print resolve_rows
             else:
                 # no differences found in relevant fields, append the first row by default
-                out.append(g.ix[g.index[0]][cols])
+                out.append(g.ix[g.index[0]])
         else:
             if not args.silent:
                 print "=========" * 10 
@@ -137,5 +207,5 @@ if __name__ == '__main__':
         pd.concat(to_resolve)[vcf_columns_a].to_csv(args.outfile + ".unresolved", sep="\t", index=False)
         print "Wrote %d unresolved records to %s" % (len(to_resolve), args.outfile + ".unresolved")
     if len(out) > 0:
-        pd.concat(out)[vcf_columns_a].to_csv(args.outfile, sep="\t", index=False)
+        pd.DataFrame(out)[vcf_columns_a].to_csv(args.outfile, sep="\t", index=False)
         print "Wrote %d merged records to %s" % (len(out), args.outfile)

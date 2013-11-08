@@ -1,19 +1,15 @@
 
 merge:
-    keys: ["CHROM","POS","SAMPLES"]
+    keys: ["CHROM","POS","SAMPLE"]
     ignore: ["QUAL", "DATA", "FORMAT"]
 rules:
-    ALT:
+    - ALT:
         order: [reject]
         reject: "*"
-    INFO.SAMPLES:
+    - INFO.SAMPLE:
         order: [reject]
         reject: "*"
-    INFO.VALID:
+    - INFO.VALIDATION:
         order: [reject, accept]
         reject: [invalid, invalidated, not_valid, failed, fail]
-        accept: [valid, validated, denovo, hiconf]
-
-
-
-
+        accept: [valid, validated, denovo, hiconf, "Not Attempted"]
