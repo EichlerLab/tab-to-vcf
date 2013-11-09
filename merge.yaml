@@ -3,6 +3,9 @@ merge:
     keys: ["CHROM","POS","SAMPLE"]
     ignore: ["QUAL", "DATA", "FORMAT"]
 rules:
+    - REF:
+        order: [reject]
+        reject: "*"
     - ALT:
         order: [reject]
         reject: "*"
