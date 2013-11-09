@@ -89,6 +89,13 @@ def apply_rule(a, b, rule):
     # no rules applied, return both
     return [a,b], False
 
+def diff(cols, a, b):
+    res = []
+    for c, _a, _b in zip(cols, a, b):
+        if _a != _b:
+            res.append(c)
+    return res
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("vcf_a")
@@ -133,9 +140,10 @@ if __name__ == '__main__':
 
     # append a-->b
     vcf = vcf_a.append(vcf_b)
+    # resort and re-create index
+    vcf = vcf.sort(["CHROM", "POS"])
     vcf = vcf.reset_index(drop=True)
     vcf_columns = vcf.columns
-
     # extract INFO field into columns
     INFO_data = map(lambda x: extract_info_field(x), vcf.INFO.values)
     for i in args.info_fields:
@@ -143,12 +151,12 @@ if __name__ == '__main__':
 
     # drop all exact duplicates
     vcf = vcf.drop_duplicates()
-    
+
     # find duplicated rows based on Chrom, Pos, Alt and Sample
     # this could be made more or less strict
     if args.fuzzy > 0:
-        args.merge_keys = [x if x != "POS" else fuzzy_pos(vcf.POS, args.fuzzy) for x in args.merge_keys]
-        grouped_vcf = vcf.groupby(args.merge_keys)
+        merge_keys = [x if x != "POS" else fuzzy_pos(vcf.POS, args.fuzzy) for x in args.merge_keys]
+        grouped_vcf = vcf.groupby(merge_keys)
     else:
         grouped_vcf = vcf.groupby(args.merge_keys)
 
@@ -166,18 +174,10 @@ if __name__ == '__main__':
         elif len(g) == 2:
             a = g[cols].values[0]
             b = g[cols].values[1]
-            matcher = difflib.SequenceMatcher(lambda x: x in cols, a, b)
-            resolve_rows = ""
-            resolve_fields = []
-            for tag, i1, i2, j1, j2 in matcher.get_opcodes(): 
-                if tag != "equal":
-                    resolve_rows += "%s\tRow 1:%s\n\tRow 2:%s\n" % (cols[i1], a[i1:i2][0],b[j1:j2][0])
-                    if cols[i1] in args.info_fields:
-                        resolve_fields.append("INFO." + cols[i1])
-                    else:
-                        resolve_fields.append(cols[i1])
+            diff_res = diff(cols, a, b)
+            resolve_fields = [tag if tag not in args.info_fields else "INFO.%s" % tag for tag in diff_res]
             rule_success = False
-            if resolve_rows != "":
+            if len(resolve_fields) > 0:
                 # Apply rules here if available to resolve if possible
                 for field in resolve_fields:
                     if field in rule_list:
@@ -208,7 +208,7 @@ if __name__ == '__main__':
                     print "\t" + "\t".join(cols)
                     print "Row 1:\t" + "\t".join([str(x) for x in a])
                     print "Row 2:\t" + "\t".join([str(x) for x in b])
-                    print resolve_rows
+                    print ", ".join(resolve_fields)
             else:
                 # no differences found in relevant fields, append the first row by default
                 out.append(g.ix[g.index[0]])
@@ -221,8 +221,12 @@ if __name__ == '__main__':
             to_resolve.append(g)
     
     if len(to_resolve) > 0:
-        pd.concat(to_resolve)[vcf_columns_a].to_csv(args.outfile + ".unresolved", sep="\t", index=False)
+        pd.concat(to_resolve)[vcf_columns_a] \
+            .sort(["CHROM", "POS"]) \
+            .to_csv(args.outfile + ".unresolved", sep="\t", index=False)
         print "Wrote %d unresolved records to %s" % (len(to_resolve), args.outfile + ".unresolved")
     if len(out) > 0:
-        pd.DataFrame(out)[vcf_columns_a].to_csv(args.outfile, sep="\t", index=False)
+        pd.DataFrame(out)[vcf_columns_a] \
+            .sort(["CHROM", "POS"]) \
+            .to_csv(args.outfile, sep="\t", index=False)
         print "Wrote %d merged records to %s" % (len(out), args.outfile)
