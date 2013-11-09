@@ -39,6 +39,17 @@ def parse_config(config, args):
     rules = config.get("rules", None)
     return args, rules
 
+def fuzzy_pos(positions, fuzzy=2):
+    last_pos = 0
+    key = 0
+    out = []
+    for pos in positions:
+        if pos - last_pos > fuzzy:
+            key += 1
+        out.append(key)
+        last_pos = pos
+    return out
+
 def compare_rule_kw(kw, kw_list):
     if kw_list == "*":
         return 0
@@ -92,6 +103,8 @@ if __name__ == '__main__':
              "Default is to ignore all INFO keys")
     parser.add_argument("--ignore-fields", required=False, nargs="+", default=[],
         help="List of column names to ignore Default is to ignore no columns")
+    parser.add_argument("--fuzzy", required=False, default=0, type=int,
+        help="Consider POS values +/- this value to be equivalent")
     parser.add_argument("--silent", required=False, default=False)
 
     # Parse args and optional YAML config file
@@ -132,8 +145,12 @@ if __name__ == '__main__':
     vcf = vcf.drop_duplicates()
     
     # find duplicated rows based on Chrom, Pos, Alt and Sample
-    # this could be made more or less strict 
-    grouped_vcf = vcf.groupby(args.merge_keys)
+    # this could be made more or less strict
+    if args.fuzzy > 0:
+        args.merge_keys = [x if x != "POS" else fuzzy_pos(vcf.POS, args.fuzzy) for x in args.merge_keys]
+        grouped_vcf = vcf.groupby(args.merge_keys)
+    else:
+        grouped_vcf = vcf.groupby(args.merge_keys)
 
     # Ignore the INFO column proper (since relevant keys have already been copied into new columns)
     ignore_cols = ["INFO"]
