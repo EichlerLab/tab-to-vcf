@@ -131,19 +131,6 @@ EFF_LEVELS = {"SPLICE_SITE_ACCEPTOR": 4,
             "CUSTOM": 1, 
             "CDS": 1}             
 
-#def parse_info(info_field):
-#    return {x.split("=")[0]:x.split("=")[1]for x in info_field.split(";")}  
-
-def parse_info(info_field):
-    d = {}
-    for x in info_field.split(";"):
-        try:
-            k,v = x.split("=")
-            d[k] = v
-        except:
-            continue
-    return d
-
 def parse_annotations(info_field):
     field_list = info_field.split(";")
     out = {}
