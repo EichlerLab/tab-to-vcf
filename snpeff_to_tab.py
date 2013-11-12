@@ -2,6 +2,7 @@ import pandas as pd
 import argparse
 from cStringIO import StringIO
 import numpy as np
+import yaml
 
 def read_vcf(vcf_filename, columns=None):
     columns = None
@@ -20,77 +21,6 @@ def read_vcf(vcf_filename, columns=None):
     df = pd.read_csv(s, sep="\t",names=columns)
     return df, vcf_header_lines, columns
 
-formatters = {'AB': float,
-              'AC': float,
-              'AF': float,
-              'AN': float,
-              'Alignability': float,
-              'BaseQRankSum': float,
-              'DB': float,
-              'DP': float,
-              'Dels': float,
-              'EFF': None,
-              'HRun': float,
-              'LowMQ': lambda x: [float(y) for y in x.split(",")],
-              'MQ': float,
-              'MQ0': float,
-              'MQRankSum': float,
-              'QD': float,
-              'SB': float,
-              'dbNSFP_1000Gp1_AC': float,
-              'dbNSFP_1000Gp1_AFR_AC': float,
-              'dbNSFP_1000Gp1_AMR_AC': float,
-              'dbNSFP_1000Gp1_ASN_AC': float,
-              'dbNSFP_1000Gp1_EUR_AC': float,
-              'dbNSFP_29way_logOdds': float,
-              'dbNSFP_29way_pi': lambda x: [float(y) for y in x.split(":")],
-              'dbNSFP_Ancestral_allele': str,
-              'dbNSFP_ESP6500_AA_AF': float,
-              'dbNSFP_ESP6500_EA_AF': float,
-              'dbNSFP_FATHMM_score': float,
-              'dbNSFP_GERP++_NR': float,
-              'dbNSFP_GERP++_RS': float,
-              'dbNSFP_GERP++_RS': float,
-              'dbNSFP_GERP++_NR': float,
-              'dbNSFP_LRT_Omega': float,
-              'dbNSFP_LRT_score': float,
-              'dbNSFP_MutationAssessor_score': float,
-              'dbNSFP_MutationTaster_score': float,
-              #'dbNSFP_Polyphen2_HDIV_score': lambda x: [float(y) for y in x.split(",")],
-              #'dbNSFP_Polyphen2_HVAR_score': lambda x: [float(y) for y in x.split(",")],
-              'dbNSFP_Polyphen2_HDIV_score': lambda x: max([float(y) for y in x.split(",")]),
-              'dbNSFP_Polyphen2_HVAR_score': lambda x: max([float(y) for y in x.split(",")]),
-              'dbNSFP_SIFT_score': float,
-              'dbNSFP_SLR_test_statistic': float,
-              'dbNSFP_Uniprot_id': lambda x: ", ".join(filter(lambda x: x!=".", x.split(","))),
-              'dbNSFP_Ensembl_transcriptid': lambda x: x.split(","),
-              'dbNSFP_phyloP': float,
-              'dbNSFP_UniSNP_ids': str,
-              'dbSNPBuildID':int,
-              'VALIDATION': lambda x: x.split(","),
-              'STUDY': lambda x: x.split(",")}
-
-short_key_names = {'dbNSFP_1000Gp1_AC': '1000Genomes_Total_Count',
-                   'dbNSFP_1000Gp1_AFR_AC': '1000Genomes_AFR_Count',
-                   'dbNSFP_1000Gp1_AMR_AC': '1000Genomes_AMR_Count',
-                   'dbNSFP_1000Gp1_ASN_AC': '1000Genomes_ASN_Count',
-                   'dbNSFP_1000Gp1_EUR_AC': '1000Genomes_EUR_Count',
-                   'dbNSFP_Ancestral_allele': 'Ancestral_Allele',
-                   'dbNSFP_ESP6500_AA_AF': 'ESP_AA_Allele_Fraction',
-                   'dbNSFP_ESP6500_EA_AF': 'ESP_EA_Allele_Fraction',
-                   'dbNSFP_FATHMM_score': 'FATHMM_score',
-                   'dbNSFP_GERP++_RS': 'GERPrs',
-                   'dbNSFP_GERP++_NR': 'GERPnr',
-                   'dbNSFP_LRT_score': 'LRT_score',
-                   'dbNSFP_MutationAssessor_score': 'Mutation_Assessor',
-                   'dbNSFP_MutationTaster_score': 'Mutation_Taster',
-                   'dbNSFP_Polyphen2_HDIV_score': 'PolyPhen2_hdiv',
-                   'dbNSFP_Polyphen2_HVAR_score': 'PolyPhen2_hvar',
-                   'dbNSFP_SIFT_score': 'SIFT',
-                   'dbNSFP_SLR_test_statistic': 'SLR',
-                   'dbNSFP_29way_logOdds': 'SiPhy',
-                   'dbNSFP_phyloP': 'PhyloP_Score',
-                   'dbNSFP_Uniprot_id':'Uniprot_id'}
 
 EFF_LEVELS = {"SPLICE_SITE_ACCEPTOR": 4, 
             "SPLICE_SITE_DONOR": 4, 
@@ -131,7 +61,25 @@ EFF_LEVELS = {"SPLICE_SITE_ACCEPTOR": 4,
             "CUSTOM": 1, 
             "CDS": 1}             
 
-def parse_annotations(info_field):
+def parse_EFF(value):
+    # this is the SNPEFF field, parse it appropriately
+    #NON_SYNONYMOUS_CODING(MODERATE|MISSENSE|Gtt/Att|V5I|293|HNRNPCL1||CODING|NM_001013631.1|2|1),
+    #MODERATE|MISSENSE|cGc/cCc|R1113P|1159|INPP5D||CODING|NM_005541.3|25|1|WARNING_TRANSCRIPT_INCOMPLETE
+    EFF_LIST = []
+    for effect in value.split(","):
+        EFF = {}    
+        EFF["e"], t = effect.split("(",1)
+        try:
+            # no optional warning field
+            _, EFF["f"], EFF["cc"], EFF["aa"], _, EFF["g"], _, _, EFF["tx"], EFF["r"], _ = t.split("|")
+        except:
+            _, EFF["f"], EFF["cc"], EFF["aa"], _, EFF["g"], _, _, EFF["tx"], EFF["r"], _, EFF["err"] = t[:-1].split("|") #-1 removes trailing ")"
+            # clear out any empty fields!
+        EFF_LIST.append({k:v for k,v in EFF.iteritems() if v is not ''})
+    return EFF_LIST
+
+
+def parse_annotations(info_field, config_df):
     field_list = info_field.split(";")
     out = {}
     for field in field_list:
@@ -140,64 +88,58 @@ def parse_annotations(info_field):
         except:
             #print "COULD NOT PARSE INFO FIELD", field
             continue
-        if key == "SAMPLE":
-            out["SAMPLE"] = value.split(",")
-        elif key == "EFF":
-            # this is the SNPEFF field, parse it appropriately
-            #NON_SYNONYMOUS_CODING(MODERATE|MISSENSE|Gtt/Att|V5I|293|HNRNPCL1||CODING|NM_001013631.1|2|1),
-            #MODERATE|MISSENSE|cGc/cCc|R1113P|1159|INPP5D||CODING|NM_005541.3|25|1|WARNING_TRANSCRIPT_INCOMPLETE
-            EFF_LIST = []
-            for effect in value.split(","):
-                EFF = {}    
-                EFF["e"], t = effect.split("(",1)
-                try:
-                    # no optional warning field
-                    _, EFF["f"], EFF["cc"], EFF["aa"], _, EFF["g"], _, _, EFF["tx"], EFF["r"], _ = t.split("|")
-                except:
-                    _, EFF["f"], EFF["cc"], EFF["aa"], _, EFF["g"], _, _, EFF["tx"], EFF["r"], _, EFF["err"] = t[:-1].split("|") #-1 removes trailing ")"
-                # clear out any empty fields!
-                EFF_LIST.append({k:v for k,v in EFF.iteritems() if v is not ''})
-            out["EFF"] = EFF_LIST
-        elif key[0:6] == "dbnsfp":
-            # These are tne dbNSFP fields, process them appropriately!
-            if "dbNSFP" not in out:
-                out["dbNSFP"] = {}
-            try:
-                k = short_key_names.get(key,key)
-                out["dbNSFP"][k] = formatters[key](value)
-            except ValueError:
-                print key, value
-        elif key == "LOF":
-            # this is the output from the -lof function
-            # value will be (Gene | ID | num_transcripts | percent_affected)
-            value = value.split(",")[0]
-            _, _, total_tx, lof_percent = value.rstrip(")").split("|")
-            out["LOF_tx"] = int(float(lof_percent) * int(total_tx))
-            out["Num_tx"] = int(total_tx)
-        else:
-            if key in formatters:
-                k = short_key_names.get(key,key)
-                if k is not None:
-                    out[k] = formatters[key](value)
+        for ix, key_config in config_df[config_df["vcf-name"] == "INFO.%s" % key].iterrows():
+            out_column_name = key_config["col"]
+            if out_column_name in ["EFF"]:
+                out_value = parse_EFF(value)
+            elif type(key_config["formatter"]) == str:
+                out_value = eval(key_config["formatter"])(value)
+            else:
+                out_value = key_config["formatter"](value)
+            out[out_column_name] = out_value
     return out
 
+def load_config(config_file):
+    y = yaml.load(open(args.config))
+    for ix, col in enumerate(y["output"]):
+        if type(col) != dict:
+            y["output"][ix] = {"col":col, "formatter":str,"vcf-name":col}
+        else:
+            col_name = col.keys()[0]
+            d = {"col": col_name}
+            if col_name in FIELDSETS:
+                d.update(col[col_name])
+            else:
+                d["vcf-name"] = y["output"][ix][col_name].get("vcf-name",col_name)
+                if "formatter" not in y["output"][ix][col_name]:
+                    d["formatter"] = str
+                elif y["output"][ix][col_name]["formatter"].startswith("lambda"):
+                    d["formatter"] = eval(y["output"][ix][col_name]["formatter"])
+                else:
+                    d["formatter"] = y["output"][ix][col_name]["formatter"]
+            y["output"][ix] = d
+    return y
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("in_vcf", help="Input VCF file to process")
     parser.add_argument("out_tab", help="Output tab-delimited file")
+    parser.add_argument("--config", required=False, default=None)
     parser.add_argument("--max-num-effects", required=False, default=3, type=int, help="Maximum number of effects to output per variant")
     #parser.add_argument("--panda-df", required=False, help="Optional pickled ouput panda dataframe")
     args = parser.parse_args()
 
+    config = load_config(args.config)
 
     vcf,_,_ = read_vcf(args.in_vcf)
 
     MAX_EFF = args.max_num_effects
+    FIELDSETS = ["EFF"]
 
     out = []
     for ix, row in vcf.iterrows():
-        info = parse_annotations(row["INFO"])
+        info = parse_annotations(row["INFO"], config)
+        # TODO, start here with refactor
         for s_ix, s in enumerate(info["SAMPLE"]):
             d = dict(row).copy()
             d["sample_id"] = s
