@@ -1,0 +1,68 @@
+output:
+    - CHROM
+    - POS
+    - REF
+    - ALT
+    - SAMPLE:
+        vcf-name: SAMPLES
+        ungroup: 'lambda x: x.split(",")'
+    - STUDY:
+        vcf-name: STUDY
+        ungroup: 'lambda x: x.split(",")'
+    - VALIDATION:
+        vcf-name: VALIDATION
+        ungroup: 'lambda x: x.split(",")'
+    - ID
+    - dbSNPBuildID
+    - EFF:
+        vcf-name: INFO.EFF
+        fieldset: [EFF_gene, EFF_effect, EFF_group, EFF_AA, EFF_exon, EFF_transcript]
+    #- LOF:
+    #    computed: 
+    - 1000Genomes_Total_Count:
+        vcf-name: INFO.dbNSFP_1000Gp1_AC
+        formatter: int
+    - ESP_AA_Allele_Fraction:
+        vcf-name: INFO.dbNSFP_ESP6500_AA_AF
+        formatter: float
+    - ESP_EA_Allele_Fraction:
+        vcf-name: INFO.dbNSFP_ESP6500_EA_AF
+        formatter: float
+    - SIFT:
+        vcf-name: INFO.dbNSFP_SIFT_score
+        formatter: float
+    - PolyPhen2_hdiv:
+        vcf-name: INFO.dbNSFP_Polyphen2_HDIV_score
+        formatter: 'lambda x: max([float(y) for y in x.split(",")])'
+    - PolyPhen2_hvar:
+        vcf-name: INFO.dbNSFP_Polyphen2_HVAR_score
+        formatter: 'lambda x: max([float(y) for y in x.split(",")])'
+    - Mutation_Assessor:
+        vcf-name: INFO.dbNSFP_MutationAssessor_score
+        formatter: float
+    - LRT_score:
+        vcf-name: INFO.dbNSFP_LRT_score
+        formatter: float
+    - Mutation_Taster:
+        vcf-name: INFO.dbNSFP_MutationTaster_score
+        formatter: float
+    - GERPrs:
+        vcf-name: INFO.dbNSFP_GERP++_RS
+        formatter: float
+    - GERPnr:
+        vcf-name: INFO.dbNSFP_GERP++_NR
+        formatter: float
+    - PhyloP_Score:
+        vcf-name: INFO.dbNSFP_phyloP
+        formatter: float
+    - SiPhy:
+        vcf-name: INFO.dbNSFP_29way_logOdds
+        formatter: float
+    - FATHMM_score:
+        vcf-name: INFO.dbNSFP_FATHMM_score
+        formatter: float
+    - Ancestral_Allele:
+        vcf-name: INFO.dbNSFP_Ancestral_allele
+    - Uniprot_id:
+        vcf-name: INFO.dbNSFP_Uniprot_id
+        formatter: 'lambda x: ", ".join(filter(lambda x: x!=".", x.split(",")))'
