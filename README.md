@@ -50,24 +50,24 @@ Several programs are available for vcf-flow:
 1. Set up merge.yaml configure file (See comments below for meaning of options)
 
     ```yaml
-        merge:                                                # This first section describes which parts of the input GCFs to check for merge conflicts
-            keys: ["CHROM","POS","SAMPLE"]                    # Merge the GCF on these fields (default)
-            ignore: ["QUAL", "DATA", "FORMAT"]                # Do not consider these fields when merging
+    merge:                                                # This first section describes which parts of the input GCFs to check for merge conflicts
+        keys: ["CHROM","POS","SAMPLE"]                    # Merge the GCF on these fields (default)
+        ignore: ["QUAL", "DATA", "FORMAT"]                # Do not consider these fields when merging
 
-        rules:                                                # the "rules" section specifies which GCF record to put into final VCF file
-                                                              # rules can specifiy a "reject" pattern and an "accept" pattern
-                                                              # depending on the "order" of and the order of keywords, GCF records with matching
-                                                              # merge-keys are either merged into a single VCF record or to placed into the .unresolved file
-            - REF:                                            # First rule (Rules are given in order) operates on the REF field
-                order: [reject]                               # Always reject...
-                reject: "*"                                   # Any differences in the REF field
-            - INFO.SAMPLE:                                    # Second rule operates on the SAMPLE key of the INFO field
-                order: [reject]                               # Always reject...
-                reject: "*"                                   # all differences.
-            - INFO.VALIDATION:                                # Third rule (if REF and SAMPLE are not differing)
-                order: [reject, accept]                       # Apply "reject" rules first, then "accept"
-                reject: [invalid, failed, fail]               # Do any of these keywords match the value of the VALIDATION key? If so, reject merge
-                accept: [valid, "denovo"]                     # Otherwise, does VALIDATION match any of these keys? If so, accept that GCF record
+    rules:                                                # the "rules" section specifies which GCF record to put into final VCF file
+                                                          # rules can specifiy a "reject" pattern and an "accept" pattern
+                                                          # depending on the "order" of and the order of keywords, GCF records with matching
+                                                          # merge-keys are either merged into a single VCF record or to placed into the .unresolved file
+        - REF:                                            # First rule (Rules are given in order) operates on the REF field
+            order: [reject]                               # Always reject...
+            reject: "*"                                   # Any differences in the REF field
+        - INFO.SAMPLE:                                    # Second rule operates on the SAMPLE key of the INFO field
+            order: [reject]                               # Always reject...
+            reject: "*"                                   # all differences.
+        - INFO.VALIDATION:                                # Third rule (if REF and SAMPLE are not differing)
+            order: [reject, accept]                       # Apply "reject" rules first, then "accept"
+            reject: [invalid, failed, fail]               # Do any of these keywords match the value of the VALIDATION key? If so, reject merge
+            accept: [valid, "denovo"]                     # Otherwise, does VALIDATION match any of these keys? If so, accept that GCF record
     ```
 
     Some other notes:
@@ -88,9 +88,9 @@ Several programs are available for vcf-flow:
 
     Output files:
 
-        * merged.gcf: Merged output. Contains only a single record for each CHROM/POS/SAMPLE. The 
-        * merged.gcf.unresolved: Unresolved merges (GCF records which triggered a reject rule or had more than 2 GCF records for a (fuzzy) position)
-        * merge.log: Human readable list of merge conflicts
+    * merged.gcf: Merged output. Contains only a single record for each CHROM/POS/SAMPLE. The 
+    * merged.gcf.unresolved: Unresolved merges (GCF records which triggered a reject rule or had more than 2 GCF records for a (fuzzy) position)
+    * merge.log: Human readable list of merge conflicts
 
 ### Convert a GCF file to a VCF file:
 
@@ -102,38 +102,38 @@ Several programs are available for vcf-flow:
 1. Set up an `output.yaml` configuration file, which specifies how to map VCF fields into a tab-delimited format
 
     ```yaml
-        output:
-            - CHROM                                  # each entry corresponds to the name of the OUTPUT column
-            - POS                                    # The default is that VCF and OUTPUT column names are identical
-            - REF                                    # Here we simply are copying the initial VCF fields into our output
-            - ALT
-            - SAMPLE:                                # If you wish to export a KEY=VALUE field from the INFO field, 
-                vcf-name: INFO.SAMPLE                # use the vcf-name option and the "INFO.<KEY>" scheme
-                ungroup: 'lambda x: x.split(",")'    # This will "ungroup" or "unravel" the VCF based on this key 
-                                                     # and will split the comma-separated list of SAMPLES
-            - STUDY:
-                vcf-name: INFO.STUDY
-                ungroup: 'lambda x: x.split(",")'    # Again, split the comma-separated list in INFO.STUDY into new output lines
-            - VALIDATION:                   
-                vcf-name: INFO.VALIDATION
-                ungroup: 'lambda x: x.split(",")'
-            - ID
-            - dbSNPBuildID:                          # Here we are renaming the "dbSNPBuildID" key in the VCF INFO field to
-                vcf-name: INFO.dbSNPBuildID          # simply "dbSNPBuildID" as an output column
-            - EFF:
-                vcf-name: INFO.EFF
-                formatter: formatters.EFF            # Make use of the built-in formatter for SnpEff fields
-                options:                             # these formatters are in the FormatterManager class
-                    max_num_effects: 1               # output only the most deleterious effect
-            - LOF:
-                vcf-name: INFO.LOF
-                formatter: 'lambda x: x.split("|")[-1].rstrip(")")'  # Use a custom formatter to process the LOF key in the INFO field
-            - 1000Genomes_Total_Count:
-                vcf-name: INFO.dbNSFP_1000Gp1_AC
-                formatter: int
-            - ESP_AA_Allele_Fraction:
-                vcf-name: INFO.dbNSFP_ESP6500_AA_AF
-                formatter: float
+    output:
+        - CHROM                                  # each entry corresponds to the name of the OUTPUT column
+        - POS                                    # The default is that VCF and OUTPUT column names are identical
+        - REF                                    # Here we simply are copying the initial VCF fields into our output
+        - ALT
+        - SAMPLE:                                # If you wish to export a KEY=VALUE field from the INFO field, 
+            vcf-name: INFO.SAMPLE                # use the vcf-name option and the "INFO.<KEY>" scheme
+            ungroup: 'lambda x: x.split(",")'    # This will "ungroup" or "unravel" the VCF based on this key 
+                                                 # and will split the comma-separated list of SAMPLES
+        - STUDY:
+            vcf-name: INFO.STUDY
+            ungroup: 'lambda x: x.split(",")'    # Again, split the comma-separated list in INFO.STUDY into new output lines
+        - VALIDATION:                   
+            vcf-name: INFO.VALIDATION
+            ungroup: 'lambda x: x.split(",")'
+        - ID
+        - dbSNPBuildID:                          # Here we are renaming the "dbSNPBuildID" key in the VCF INFO field to
+            vcf-name: INFO.dbSNPBuildID          # simply "dbSNPBuildID" as an output column
+        - EFF:
+            vcf-name: INFO.EFF
+            formatter: formatters.EFF            # Make use of the built-in formatter for SnpEff fields
+            options:                             # these formatters are in the FormatterManager class
+                max_num_effects: 1               # output only the most deleterious effect
+        - LOF:
+            vcf-name: INFO.LOF
+            formatter: 'lambda x: x.split("|")[-1].rstrip(")")'  # Use a custom formatter to process the LOF key in the INFO field
+        - 1000Genomes_Total_Count:
+            vcf-name: INFO.dbNSFP_1000Gp1_AC
+            formatter: int
+        - ESP_AA_Allele_Fraction:
+            vcf-name: INFO.dbNSFP_ESP6500_AA_AF
+            formatter: float
     ```
 
 2. Run the vcf_to_tab.py program:
