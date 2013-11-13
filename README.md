@@ -1,7 +1,7 @@
 vcf-flow
 =======
-a yaml-based toolkit for managing VCF files
-====
+### a yaml-based toolkit for managing VCF files
+
 
 Vcf-flow is a set of tools designed for working with [Variant Call Files](http://www.1000genomes.org/wiki/Analysis/Variant%20Call%20Format/vcf-variant-call-format-version-41). Unique to vcf-flow is the ability to configure each tool using a [YAML](http://en.wikipedia.org/wiki/YAML) configuration file, which makes repeatable workflows or pipelines possible.  Currently there are several available tools:
 
@@ -19,8 +19,7 @@ Several programs are available for vcf-flow:
  *  *gcf_to_vcf.py* Convert a GCF file into a VCF file, grouping relevant attributes from each GCF record.
  *  *vcf_to_tab.py* Converts a VCF file into a tab-delimited file based on a YAML config file
 
-Install
-===---
+### Install
 
     git clone https://github.com/EichlerLab/vcf-flow.git
     cd vcf-flow
@@ -29,11 +28,9 @@ Install
     pip install -r requirements.txt
     pip install -e git+https://github.com/brentp/fastahack-python.git#egg=fastahack-python
 
-Sample Workflow(s)
-====
 
-Convert tab-delimited file to GCF:
-===
+## Sample Workflow(s)
+### Convert tab-delimited file to GCF:
 
 1. Download reference genome
 
@@ -48,8 +45,7 @@ Convert tab-delimited file to GCF:
 
         the `--info-fields` specifies which tab-delimited fields int the input variants.tab should be converted to  `KEY=VALUE` pairs in the INFO field of the VCF. The `--info-fields` are given as a comma-separated mapping of `input:output`, where `input` refers to the column name in the input file and `output` referes to the `KEY` of the INFO field.
 
-Merge two GCF files (with optional fuzziness parameter)
-===
+### Merge two GCF files (with optional fuzziness parameter)
 
 1. Set up merge.yaml configure file (See comments below for meaning of options)
 
@@ -96,14 +92,12 @@ Merge two GCF files (with optional fuzziness parameter)
         * merged.gcf.unresolved: Unresolved merges (GCF records which triggered a reject rule or had more than 2 GCF records for a (fuzzy) position)
         * merge.log: Human readable list of merge conflicts
 
-Convert a GCF file to a VCF file:
-===
+### Convert a GCF file to a VCF file:
 
     python tab-to-vcf/gcf_to_vcf.py merged.gcf merged.vcf
 
 
-Create a tab-delimited file from a VCF file:
-===
+### Create a tab-delimited file from a VCF file:
 
 1. Set up an `output.yaml` configuration file, which specifies how to map VCF fields into a tab-delimited format
 
