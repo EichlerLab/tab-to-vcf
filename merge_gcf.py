@@ -1,7 +1,6 @@
 import pandas as pd
 import argparse
 from cStringIO import StringIO
-import difflib
 import yaml
 
 def read_vcf(vcf_filename, columns=None):
