@@ -61,25 +61,72 @@ EFF_LEVELS = {"SPLICE_SITE_ACCEPTOR": 4,
             "CUSTOM": 1, 
             "CDS": 1}             
 
-def parse_EFF(value):
-    # this is the SNPEFF field, parse it appropriately
-    #NON_SYNONYMOUS_CODING(MODERATE|MISSENSE|Gtt/Att|V5I|293|HNRNPCL1||CODING|NM_001013631.1|2|1),
-    #MODERATE|MISSENSE|cGc/cCc|R1113P|1159|INPP5D||CODING|NM_005541.3|25|1|WARNING_TRANSCRIPT_INCOMPLETE
-    EFF_LIST = []
-    for effect in value.split(","):
-        EFF = {}    
-        EFF["e"], t = effect.split("(",1)
-        try:
-            # no optional warning field
-            _, EFF["f"], EFF["cc"], EFF["aa"], _, EFF["g"], _, _, EFF["tx"], EFF["r"], _ = t.split("|")
-        except:
-            _, EFF["f"], EFF["cc"], EFF["aa"], _, EFF["g"], _, _, EFF["tx"], EFF["r"], _, EFF["err"] = t[:-1].split("|") #-1 removes trailing ")"
-            # clear out any empty fields!
-        EFF_LIST.append({k:v for k,v in EFF.iteritems() if v is not ''})
-    return EFF_LIST
+class FormatterManager(object):
+    def __init__(self):
+        super(FormatterManager, self).__init__()
+        prefix = "formatters."
+        self.formatters = {
+            "%sEFF" % prefix: self.parse_EFF
+        }
+        self.columns = {
+            "%sEFF" % prefix: self.cols_EFF
+        }
 
+    def get_formatter(self, name):
+        if name in self.formatters:
+            return self.formatters[name]
+        else:
+            return None
+    
+    def get_columns(self, name):
+        if name in self.columns:
+            return self.columns[name]
+        else:
+            return None
+    
+    def parse_EFF(self, value, max_num_effects=1):
+        # this is the SNPEFF field, parse it appropriately
+        #NON_SYNONYMOUS_CODING(MODERATE|MISSENSE|Gtt/Att|V5I|293|HNRNPCL1||CODING|NM_001013631.1|2|1),
+        #MODERATE|MISSENSE|cGc/cCc|R1113P|1159|INPP5D||CODING|NM_005541.3|25|1|WARNING_TRANSCRIPT_INCOMPLETE
+        EFF_LIST = []
+        for effect in value.split(","):
+            EFF = {}    
+            EFF["e"], t = effect.split("(",1)
+            try:
+                # no optional warning field
+                _, EFF["f"], EFF["cc"], EFF["aa"], _, EFF["g"], _, _, EFF["tx"], EFF["r"], _ = t.split("|")
+            except:
+                _, EFF["f"], EFF["cc"], EFF["aa"], _, EFF["g"], _, _, EFF["tx"], EFF["r"], _, EFF["err"] = t[:-1].split("|") #-1 removes trailing ")"
+                # clear out any empty fields!
+            EFF_LIST.append({k:v for k,v in EFF.iteritems() if v is not ''})
+        
 
-def parse_annotations(info_field, config_df):
+        eff_levels = np.array([EFF_LEVELS[eff["e"]] for eff in EFF_LIST])
+        eff_argsort = np.argsort(eff_levels)[::-1]
+        eff_sorted = np.array(EFF_LIST)[eff_argsort][0:max_num_effects]
+        already_added_changes = []
+        i = 1
+        d = {}
+        for e_ix, e in enumerate(eff_sorted[0:max_num_effects]):
+            if ("aa" not in e) or (e["aa"] not in already_added_changes):
+                d["EFF_%d_gene" % i] = e["g"]
+                d["EFF_%d_effect" % i] = e["e"]
+                d["EFF_%d_group" % i] = e.get("f",None)
+                d["EFF_%d_exon" % i] = e.get("r", None)
+                d["EFF_%d_AA" % i] = e.get("aa",None)
+                d["EFF_%d_transcript" % i] = e.get("tx", None)
+                already_added_changes.append(e.get("aa",None))
+                i += 1
+        return d
+
+    def cols_EFF(self, max_num_effects=1):
+        eff_cols = ["EFF_%d_gene","EFF_%d_effect","EFF_%d_group","EFF_%d_AA","EFF_%d_exon","EFF_%d_transcript"]
+        eff_out_cols = []
+        for i in range(1, max_num_effects+1):
+            eff_out_cols.extend([s % i for s in eff_cols])
+        return eff_out_cols
+
+def parse_annotations(info_field, config_df, formatter_manager):
     field_list = info_field.split(";")
     out = {}
     for field in field_list:
@@ -90,27 +137,39 @@ def parse_annotations(info_field, config_df):
             continue
         for ix, key_config in config_df[config_df["vcf-name"] == "INFO.%s" % key].iterrows():
             out_column_name = key_config["col"]
-            if out_column_name in ["EFF"]:
-                out_value = parse_EFF(value)
+            if key_config["formatter"] in formatter_manager.formatters:
+                kwargs = key_config.get("options", None)
+                out_value = formatter_manager.get_formatter(key_config["formatter"])(value, **kwargs)
+            elif key_config["ungroup"]:
+                out_value = key_config["ungroup"](value)                
             elif type(key_config["formatter"]) == str:
                 out_value = eval(key_config["formatter"])(value)
             else:
                 out_value = key_config["formatter"](value)
-            out[out_column_name] = out_value
+            if type(out_value) == dict:
+                out.update(out_value)
+            else:
+                out[out_column_name] = out_value
     return out
 
 def load_config(config_file):
-    y = yaml.load(open(args.config))
+    y = yaml.load(open(config_file))
     for ix, col in enumerate(y["output"]):
         if type(col) != dict:
-            y["output"][ix] = {"col":col, "formatter":str,"vcf-name":col}
+            y["output"][ix] = {"col":col, 
+                               "formatter":str,
+                               "vcf-name":col,
+                               "ungroup": False}
         else:
             col_name = col.keys()[0]
             d = {"col": col_name}
-            if col_name in FIELDSETS:
+            d["ungroup"] = y["output"][ix][col_name].get("ungroup", False)            
+            if type(d["ungroup"]) == str:
+                d["ungroup"] = eval(d["ungroup"])
+            if col_name in ["EFF"]:
                 d.update(col[col_name])
             else:
-                d["vcf-name"] = y["output"][ix][col_name].get("vcf-name",col_name)
+                d["vcf-name"] = y["output"][ix][col_name].get("vcf-name",col_name)                
                 if "formatter" not in y["output"][ix][col_name]:
                     d["formatter"] = str
                 elif y["output"][ix][col_name]["formatter"].startswith("lambda"):
@@ -118,66 +177,40 @@ def load_config(config_file):
                 else:
                     d["formatter"] = y["output"][ix][col_name]["formatter"]
             y["output"][ix] = d
-    return y
+    return pd.DataFrame(y["output"])
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("in_vcf", help="Input VCF file to process")
     parser.add_argument("out_tab", help="Output tab-delimited file")
-    parser.add_argument("--config", required=False, default=None)
-    parser.add_argument("--max-num-effects", required=False, default=3, type=int, help="Maximum number of effects to output per variant")
-    #parser.add_argument("--panda-df", required=False, help="Optional pickled ouput panda dataframe")
+    parser.add_argument("config", help="config.yaml file")
     args = parser.parse_args()
 
-    config = load_config(args.config)
+    config_df = load_config(args.config)
+    formatter_mgr = FormatterManager()
 
     vcf,_,_ = read_vcf(args.in_vcf)
-
-    MAX_EFF = args.max_num_effects
-    FIELDSETS = ["EFF"]
+    
+    UNGROUP_KEYS = list(config_df[config_df["ungroup"] != False]["col"].values)
 
     out = []
     for ix, row in vcf.iterrows():
-        info = parse_annotations(row["INFO"], config)
-        # TODO, start here with refactor
-        for s_ix, s in enumerate(info["SAMPLE"]):
+        info = parse_annotations(row["INFO"], config_df, formatter_mgr)
+        for keys in zip(*[info[k] for k in UNGROUP_KEYS]):
             d = dict(row).copy()
-            d["sample_id"] = s
             d.update(info)
-            d["study"] = info["STUDY"][s_ix]
-            if "VALIDATION" in info:
-                d["VALIDATION"] = info["VALIDATION"][s_ix]
-            del d["SAMPLE"]
+            d.update(zip(UNGROUP_KEYS, keys))
             del d["INFO"]
-            if "EFF" in d:
-                eff_levels = np.array([EFF_LEVELS[eff["e"]] for eff in d["EFF"]])
-                eff_argsort = np.argsort(eff_levels)[::-1]
-                eff_sorted = np.array(d["EFF"])[eff_argsort][0:MAX_EFF]
-                already_added_changes = []
-                i = 1
-                for e_ix, e in enumerate(eff_sorted):
-                    if ("aa" not in e) or (e["aa"] not in already_added_changes):
-                        d["EFF_%d_gene" % i] = e["g"]
-                        d["EFF_%d_effect" % i] = e["e"]
-                        d["EFF_%d_group" % i] = e.get("f",None)
-                        d["EFF_%d_exon" % i] = e.get("r", None)
-                        d["EFF_%d_AA" % i] = e.get("aa",None)
-                        d["EFF_%d_transcript" % i] = e.get("tx", None)
-                        already_added_changes.append(e.get("aa",None))
-                        i += 1
-                del d["EFF"]
-            del d["FORMAT"]
-            del d["QUAL"]
-            del d["DATA"]
-            del d["FILTER"]        
             out.append(d)
 
-    eff_cols = ["EFF_%d_gene","EFF_%d_effect","EFF_%d_group","EFF_%d_AA","EFF_%d_exon","EFF_%d_transcript"]
-    eff_out_cols = []
-    for i in range(1, MAX_EFF+1):
-        eff_out_cols.extend([s % i for s in eff_cols])
+    print_cols = []
+    for ix, col in config_df.iterrows():
+        if col["formatter"] in formatter_mgr.formatters:
+            kwargs = col.get("options", {})
+            columns = formatter_mgr.get_columns(col["formatter"])(**kwargs)
+            print_cols.extend(columns)
+        else:
+            print_cols.append(col["col"])
 
-    out_cols =  ["1000Genomes_Total_Count", "ESP_AA_Allele_Fraction", "ESP_EA_Allele_Fraction", 'SIFT', 'PolyPhen2_hdiv', 'PolyPhen2_hvar', 'Mutation_Assessor', "LRT_score", 'Mutation_Taster', 'GERPrs', 'GERPnr', 'PhyloP_Score', "SiPhy", 'FATHMM_score', "Ancestral_Allele", "Uniprot_id"]
-    print_cols = ["CHROM","POS","REF","ALT","sample_id","study","VALIDATION", "ID","dbSNPBuildID"] + eff_out_cols + out_cols
     out = pd.DataFrame(out)[print_cols]
     out.to_csv(args.out_tab, sep="\t", index=False)

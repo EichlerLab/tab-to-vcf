@@ -4,21 +4,25 @@ output:
     - REF
     - ALT
     - SAMPLE:
-        vcf-name: SAMPLES
+        vcf-name: INFO.SAMPLE
         ungroup: 'lambda x: x.split(",")'
     - STUDY:
-        vcf-name: STUDY
+        vcf-name: INFO.STUDY
         ungroup: 'lambda x: x.split(",")'
     - VALIDATION:
-        vcf-name: VALIDATION
+        vcf-name: INFO.VALIDATION
         ungroup: 'lambda x: x.split(",")'
     - ID
-    - dbSNPBuildID
+    - dbSNPBuildID:
+        vcf-name: INFO.dbSNPBuildID
     - EFF:
         vcf-name: INFO.EFF
-        fieldset: [EFF_gene, EFF_effect, EFF_group, EFF_AA, EFF_exon, EFF_transcript]
-    #- LOF:
-    #    computed: 
+        formatter: formatters.EFF
+        options:
+            max_num_effects: 1
+    - LOF:
+        vcf-name: INFO.LOF
+        formatter: 'lambda x: x.split("|")[-1].rstrip(")")'
     - 1000Genomes_Total_Count:
         vcf-name: INFO.dbNSFP_1000Gp1_AC
         formatter: int
