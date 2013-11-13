@@ -39,11 +39,13 @@ Several programs are available for vcf-flow:
 
 2.  Run tab_to_gcf.py
 
-        python tab_to_gcf.py variants.tab variants.gcf human_1kg_v37.fasta \
-             --convert-iupac
-             --info-fields Sample:SAMPLE,Study:STUDY,Validation_Status:VALIDATION
+    ```shell
+    python tab_to_gcf.py variants.tab variants.gcf human_1kg_v37.fasta \
+         --convert-iupac
+        --info-fields Sample:SAMPLE,Study:STUDY,Validation_Status:VALIDATION
+    ```
 
-        the `--info-fields` specifies which tab-delimited fields int the input variants.tab should be converted to  `KEY=VALUE` pairs in the INFO field of the VCF. The `--info-fields` are given as a comma-separated mapping of `input:output`, where `input` refers to the column name in the input file and `output` referes to the `KEY` of the INFO field.
+    the `--info-fields` specifies which tab-delimited fields int the input variants.tab should be converted to  `KEY=VALUE` pairs in the INFO field of the VCF. The `--info-fields` are given as a comma-separated mapping of `input:output`, where `input` refers to the column name in the input file and `output` referes to the `KEY` of the INFO field.
 
 ### Merge two GCF files (with optional fuzziness parameter)
 
