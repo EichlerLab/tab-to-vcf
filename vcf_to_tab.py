@@ -131,17 +131,21 @@ def parse_annotations(info_field, config_df, formatter_manager):
     out = {}
     for field in field_list:
         try:
-            key,value = field.split("=")
+            key, value = field.split("=")
+            flag = False
         except:
-            #print "COULD NOT PARSE INFO FIELD", field
-            continue
+            #This is a VCF flag
+            key, value = field, None
+            flag = True
         for ix, key_config in config_df[config_df["vcf-name"] == "INFO.%s" % key].iterrows():
             out_column_name = key_config["col"]
             if key_config["formatter"] in formatter_manager.formatters:
                 kwargs = key_config.get("options", None)
                 out_value = formatter_manager.get_formatter(key_config["formatter"])(value, **kwargs)
             elif key_config["ungroup"]:
-                out_value = key_config["ungroup"](value)                
+                out_value = key_config["ungroup"](value)
+            elif flag:
+                out_value = key_config.get("flag", "True")
             elif type(key_config["formatter"]) == str:
                 out_value = eval(key_config["formatter"])(value)
             else:
