@@ -136,6 +136,9 @@ Several programs are available for vcf-flow:
         - ESP_AA_Allele_Fraction:
             vcf-name: INFO.dbNSFP_ESP6500_AA_AF
             formatter: float
+        - SegDupFlag:                           # There can also be flags in the INFO column (no value)
+            vcf-name: INFO.SegDup
+            flag: "True"                        # if the flag is set, use this value in the tab-delimited column
     ```
 
 2. Run the vcf_to_tab.py program:
