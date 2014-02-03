@@ -2,6 +2,7 @@
 merge:
     keys: ["CHROM","POS","SAMPLE"]
     ignore: ["QUAL", "DATA", "FORMAT"]
+    fuzzy: 5
 rules:
     - REF:
         order: [reject]

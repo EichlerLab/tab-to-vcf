@@ -31,6 +31,7 @@ def extract_info_field(info_field):
 def parse_config(config, args):
     args.merge_keys = config.get("merge").get("keys") or args.merge_keys
     args.ignore_fields = config.get("merge").get("ignore") or args.ignore_fields
+    args.fuzzy = config.get("merge").get("fuzzy") or args.fuzzy
     args.info_fields = [] #map(lambda x: x.lstrip("INFO."), filter(lambda x: x.startswith("INFO"), config.get("rules").keys()))
     for rule in config.get("rules"):
         if rule.keys()[0].startswith("INFO."):
@@ -58,59 +59,48 @@ def compare_rule_kw(kw, kw_list):
         except ValueError:
             return None
 
-def apply_rule(a, b, rule):
+def apply_rule_multi(rows, rule):
     rule_name = rule.keys()[0]
     rule = rule[rule_name]
     short_rule_name = rule_name.lstrip("INFO.")
     for r in rule["order"]:
-        a_ix = compare_rule_kw(a[short_rule_name], rule[r])
-        b_ix = compare_rule_kw(b[short_rule_name], rule[r])
+        rows["ix"] = map(lambda x: compare_rule_kw(x[1][short_rule_name], rule[r]), rows.iterrows())
+        ixs = rows["ix"].values
         if r == "accept":
-            if a_ix is None and b_ix is None:
-                continue    
-            elif a_ix >= b_ix:
-                return [a], True
-            elif b_ix > a_ix:
-                return [b], True
-            else:
-                # accept kw not found, continue on
+            if set(ixs) == set([None]):
+                # accept kw not found in any rows, continue on
                 continue
+            else:
+                # some rows contained the accept keyword, return that row
+                return rows.sort("ix").head(1), True
         elif r == "reject":
-            if (a_ix is not None) or (b_ix is not None):
-                # reject kw triggered in either row
-                # do not merge and return both
-                return [a, b], True
+            if len(set(ixs) - set([None])) > 0:
+                # reject kw triggered in any row
+                # do not merge and return all
+                return rows, True
             else:
                 # reject kw not found, continue on
                 continue
         else:
             Exception("unknown rule!")
-    # no rules applied, return both
-    return [a,b], False
+    # no rules applied, return all
+    return rows, False
 
-def diff(cols, a, b):
+def diff(cols, rows):
     res = []
-    for c, _a, _b in zip(cols, a, b):
-        if _a != _b:
+    for c in cols:
+        if len(set(rows[c].values)) > 1:
             res.append(c)
     return res
 
+DEFAULT_VCF_COLS = ['CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO', 'FORMAT', 'DATA']
+
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument("vcf_a")
-    parser.add_argument("vcf_b")
+    parser = argparse.ArgumentParser(description="Merge GCF files")
+    parser.add_argument('vcf1', metavar='input', help="first GCF file")
+    parser.add_argument('vcf2', nargs='+', metavar='input', help="additional GCF files to merge")
     parser.add_argument("outfile")
     parser.add_argument("--config", required=False, default=None)
-    parser.add_argument("--merge-keys", required=False, nargs="?", 
-        default=["CHROM","POS","SAMPLES"],
-        help="List of VCF column names or INFO keys used assess if rows are duplicates")
-    parser.add_argument("--info-fields", required=False, nargs="+", default=None,
-        help="List of key names in the VCF INFO field to consider when merging."
-             "Default is to ignore all INFO keys")
-    parser.add_argument("--ignore-fields", required=False, nargs="+", default=[],
-        help="List of column names to ignore Default is to ignore no columns")
-    parser.add_argument("--fuzzy", required=False, default=0, type=int,
-        help="Consider POS values +/- this value to be equivalent")
     parser.add_argument("--silent", required=False, default=False)
 
     # Parse args and optional YAML config file
@@ -120,29 +110,34 @@ if __name__ == '__main__':
         args, rules = parse_config(yaml.load(open(args.config,'r')), args)
 
     rule_list = map(lambda x: x.keys()[0], rules)
-    
+    print args
     # Load each vcf
-    vcf_a, _, vcf_columns_a = read_vcf(args.vcf_a)
-    vcf_b, _, vcf_columns_b = read_vcf(args.vcf_b)
+    all_inputs = [args.vcf1] + args.vcf2
+    print all_inputs
+    all_vcf = []
+    all_columns = []
 
-    # normalize VCFs if missing columns
-    vcf_columns = ['CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO', 'FORMAT', 'DATA']
-    for col in vcf_columns:
-        if col not in vcf_columns_b:
-            vcf_b[col] = "."
-        if col not in vcf_columns_a:
-            vcf_a[col] = "."
-
-    # sort each VCF
-    vcf_a = vcf_a.sort(["CHROM", "POS"])
-    vcf_b = vcf_b.sort(["CHROM", "POS"])
-
-    # append a-->b
-    vcf = vcf_a.append(vcf_b)
+    vcf = pd.DataFrame()
+    
+    for i in all_inputs:
+        # read file
+        vcf_in, _, cols = read_vcf(i)
+        # normalize to standard columns
+        for c in DEFAULT_VCF_COLS:
+            if c not in cols:
+                vcf_in[c] = "."
+        # save to list
+        vcf_in = vcf_in.sort(["CHROM", "POS"])
+        all_vcf.append(vcf_in)
+        all_columns.append(cols)
+        vcf = vcf.append(vcf_in)
+    
     # resort and re-create index
+
     vcf = vcf.sort(["CHROM", "POS"])
     vcf = vcf.reset_index(drop=True)
     vcf_columns = vcf.columns
+
     # extract INFO field into columns
     INFO_data = map(lambda x: extract_info_field(x), vcf.INFO.values)
     for i in args.info_fields:
@@ -163,35 +158,37 @@ if __name__ == '__main__':
     ignore_cols = ["INFO"]
     ignore_cols.extend(args.ignore_fields)
     cols = filter(lambda x: x not in ignore_cols, vcf.columns)
-    print cols
     out = []
     to_resolve = []
     for cnt, g in grouped_vcf:
         if len(g) == 1:
             # Simple case-- nothing to resolve (unique record)
             out.append(g.ix[g.index[0]])
-        elif len(g) == 2:
-            a = g[cols].values[0]
-            b = g[cols].values[1]
-            diff_res = diff(cols, a, b)
-            resolve_fields = [tag if tag not in args.info_fields else "INFO.%s" % tag for tag in diff_res]
+        else:
+            # get list of differing columns
+            diff_cols = diff(cols, g[cols])
+            # convert the column names to INFO.<col> where needed
+            resolve_fields = [tag if tag not in args.info_fields else "INFO.%s" % tag for tag in diff_cols]
             rule_success = False
+            
             if len(resolve_fields) > 0:
                 # Apply rules here if available to resolve if possible
                 for field in resolve_fields:
                     if field in rule_list:
+                        # a rule exists for this field
                         rule = rules[rule_list.index(field)]
-                        c, s = apply_rule(g.ix[g.index[0]][cols], g.ix[g.index[1]][cols], rule=rule)
+                        # apply the rule
+                        c, s = apply_rule_multi(g, rule=rule)
                         if s == False:
                             continue
                         else:
                             if len(c) == 1:
                                 # successfully resolved fields
-                                out.append(g.ix[c[0].name])
+                                out.append(c.ix[c.index[0]])
                                 rule_success = True
                                 resolved = True
                                 break
-                            elif len(c) == 2:
+                            elif len(c) >= 2:
                                 to_resolve.append(g)
                                 #to_resolve.append(c[1])
                                 rule_success = True
@@ -205,27 +202,20 @@ if __name__ == '__main__':
                 if not resolved and not args.silent:
                     print "=========" * 10
                     print "\t" + "\t".join(cols)
-                    print "Row 1:\t" + "\t".join([str(x) for x in a])
-                    print "Row 2:\t" + "\t".join([str(x) for x in b])
+                    print g
                     print ", ".join(resolve_fields)
             else:
                 # no differences found in relevant fields, append the first row by default
                 out.append(g.ix[g.index[0]])
-        else:
-            if not args.silent:
-                print "=========" * 10 
-                print "More than 2 duplicates found!"
-                for i in range(len(g)):
-                    print "Row %d:" % i + "\t".join([str(x) for x in g.ix[g.index[i]][cols]])
-            to_resolve.append(g)
-    
+    #import IPython; IPython.embed()
     if len(to_resolve) > 0:
-        pd.concat(to_resolve)[vcf_columns_a] \
+        pd.concat(to_resolve)[DEFAULT_VCF_COLS] \
             .sort(["CHROM", "POS"]) \
             .to_csv(args.outfile + ".unresolved", sep="\t", index=False)
         print "Wrote %d unresolved records to %s" % (len(to_resolve), args.outfile + ".unresolved")
     if len(out) > 0:
-        pd.DataFrame(out)[vcf_columns_a] \
+        out = pd.DataFrame(out)
+        out[DEFAULT_VCF_COLS] \
             .sort(["CHROM", "POS"]) \
             .to_csv(args.outfile, sep="\t", index=False)
         print "Wrote %d merged records to %s" % (len(out), args.outfile)
