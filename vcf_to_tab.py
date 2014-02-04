@@ -207,8 +207,12 @@ if __name__ == '__main__':
             del d["INFO"]
             out.append(d)
 
+    out = pd.DataFrame(out) 
+    
     print_cols = []
     for ix, col in config_df.iterrows():
+        if col["col"] not in out:
+            continue
         if col["formatter"] in formatter_mgr.formatters:
             kwargs = col.get("options", {})
             columns = formatter_mgr.get_columns(col["formatter"])(**kwargs)
@@ -216,5 +220,5 @@ if __name__ == '__main__':
         else:
             print_cols.append(col["col"])
 
-    out = pd.DataFrame(out)[print_cols]
-    out.to_csv(args.out_tab, sep="\t", index=False)
+    
+    out[print_cols].to_csv(args.out_tab, sep="\t", index=False)
