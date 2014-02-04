@@ -48,7 +48,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     gcf, gcf_header, gcf_cols = read_vcf(args.gcf_in)
-    print gcf.head()
+    #print gcf.head()
     INFO_data = map(lambda x: extract_info_field(x), gcf.INFO.values)
     INFO_keys = set()
     for i in INFO_data:
