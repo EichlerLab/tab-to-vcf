@@ -3,6 +3,7 @@ import argparse
 from cStringIO import StringIO
 import numpy as np
 import yaml
+import re
 
 def read_vcf(vcf_filename, columns=None):
     columns = None
@@ -147,9 +148,17 @@ def parse_annotations(info_field, config_df, formatter_manager):
             elif flag:
                 out_value = key_config.get("flag", "True")
             elif type(key_config["formatter"]) == str:
-                out_value = eval(key_config["formatter"])(value)
+                try:
+                    out_value = eval(key_config["formatter"])(value)
+                except:
+                    print "Could not convert value", value, " in column: ", key_config["col"]
+                    out_value = ""
             else:
-                out_value = key_config["formatter"](value)
+                try:
+                    out_value = key_config["formatter"](value)
+                except:
+                    print "Could not convert value", value, " in column: ", key_config["col"]
+                    out_value = ""
             if type(out_value) == dict:
                 out.update(out_value)
             else:
