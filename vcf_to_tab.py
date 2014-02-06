@@ -209,6 +209,7 @@ if __name__ == '__main__':
     out = []
     for ix, row in vcf.iterrows():
         info = parse_annotations(row["INFO"], config_df, formatter_mgr)
+
         for keys in zip(*[info[k] for k in UNGROUP_KEYS]):
             d = dict(row).copy()
             d.update(info)
@@ -216,16 +217,17 @@ if __name__ == '__main__':
             del d["INFO"]
             out.append(d)
 
+
     out = pd.DataFrame(out) 
-    
+
     print_cols = []
     for ix, col in config_df.iterrows():
-        if col["col"] not in out:
-            continue
         if col["formatter"] in formatter_mgr.formatters:
             kwargs = col.get("options", {})
             columns = formatter_mgr.get_columns(col["formatter"])(**kwargs)
             print_cols.extend(columns)
+        elif col["col"] not in out:
+            continue
         else:
             print_cols.append(col["col"])
 
