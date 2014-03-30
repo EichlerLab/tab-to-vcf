@@ -203,13 +203,13 @@ if __name__ == '__main__':
     formatter_mgr = FormatterManager()
 
     vcf,_,_ = read_vcf(args.in_vcf)
+
     
     UNGROUP_KEYS = list(config_df[config_df["ungroup"] != False]["col"].values)
 
     out = []
     for ix, row in vcf.iterrows():
         info = parse_annotations(row["INFO"], config_df, formatter_mgr)
-
         for keys in zip(*[info[k] for k in UNGROUP_KEYS]):
             d = dict(row).copy()
             d.update(info)
