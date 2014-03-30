@@ -21,7 +21,10 @@ def read_vcf(vcf_filename, columns=None):
     return df, vcf_header_lines, columns
 
 def extract_info_field(info_field):
-    info_field = info_field.rstrip(";").split(";") or []
+    try:
+        info_field = info_field.rstrip(";").split(";") or []
+    except:
+        return {}
     out = {}
     for i in info_field:
         k,v = i.split("=")
@@ -215,6 +218,7 @@ if __name__ == '__main__':
         print "Wrote %d unresolved records to %s" % (len(to_resolve), args.outfile + ".unresolved")
     if len(out) > 0:
         out = pd.DataFrame(out)
+        out.POS = out.POS.astype(int)
         out[DEFAULT_VCF_COLS] \
             .sort(["CHROM", "POS"]) \
             .to_csv(args.outfile, sep="\t", index=False)
