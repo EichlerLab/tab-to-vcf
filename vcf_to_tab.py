@@ -204,7 +204,6 @@ if __name__ == '__main__':
     parser.add_argument("--defaults", metavar="[key=value][,key2=value[,..]]", nargs="+", help="Default values for arg-name keys to add as columns in output", default=None)
     args = parser.parse_args()
 
-    print args
     if args.defaults:
         defaults = {d.split("=")[0]: d.split("=")[1] for d in args.defaults}
     else:
@@ -214,7 +213,6 @@ if __name__ == '__main__':
 
     vcf,_,_ = read_vcf(args.in_vcf)
 
-    print config_df
     UNGROUP_KEYS = list(config_df[config_df["ungroup"] != False]["col"].values)
     if len(UNGROUP_KEYS) > 0:
         ungroup = True
@@ -238,7 +236,6 @@ if __name__ == '__main__':
             out.append(d)
 
     out = pd.DataFrame(out) 
-    print out.head()
     print_cols = []
     for ix, col in config_df.iterrows():
         if col.get("default-value", None) not in [None, np.nan]:
