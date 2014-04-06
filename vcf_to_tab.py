@@ -165,7 +165,7 @@ def parse_annotations(info_field, config_df, formatter_manager):
                 out[out_column_name] = out_value
     return out
 
-def load_config(config_file):
+def load_config(config_file, defaults):
     y = yaml.load(open(config_file))
     for ix, col in enumerate(y["output"]):
         if type(col) != dict:
@@ -176,10 +176,14 @@ def load_config(config_file):
         else:
             col_name = col.keys()[0]
             d = {"col": col_name}
-            d["ungroup"] = y["output"][ix][col_name].get("ungroup", False)            
+            d["ungroup"] = y["output"][ix][col_name].get("ungroup", False)
             if type(d["ungroup"]) == str:
                 d["ungroup"] = eval(d["ungroup"])
-            if col_name in ["EFF"]:
+            if y["output"][ix][col_name].get("arg-name", False):
+                default_val = defaults.get(y["output"][ix][col_name]["arg-name"], False)
+                if default_val:
+                    d.update({"default-value": default_val})
+            elif col_name in ["EFF"]:
                 d.update(col[col_name])
             else:
                 d["vcf-name"] = y["output"][ix][col_name].get("vcf-name",col_name)                
@@ -197,32 +201,50 @@ if __name__ == '__main__':
     parser.add_argument("in_vcf", help="Input VCF file to process")
     parser.add_argument("out_tab", help="Output tab-delimited file")
     parser.add_argument("config", help="config.yaml file")
+    parser.add_argument("--defaults", metavar="[key=value][,key2=value[,..]]", nargs="+", help="Default values for arg-name keys to add as columns in output", default=None)
     args = parser.parse_args()
 
-    config_df = load_config(args.config)
+    print args
+    if args.defaults:
+        defaults = {d.split("=")[0]: d.split("=")[1] for d in args.defaults}
+    else:
+        defaults = {}
+    config_df = load_config(args.config, defaults)
     formatter_mgr = FormatterManager()
 
     vcf,_,_ = read_vcf(args.in_vcf)
 
-    
+    print config_df
     UNGROUP_KEYS = list(config_df[config_df["ungroup"] != False]["col"].values)
+    if len(UNGROUP_KEYS) > 0:
+        ungroup = True
+    else:
+        ungroup = False
 
     out = []
     for ix, row in vcf.iterrows():
         info = parse_annotations(row["INFO"], config_df, formatter_mgr)
-        for keys in zip(*[info[k] for k in UNGROUP_KEYS]):
+        if ungroup:
+            for keys in zip(*[info[k] for k in UNGROUP_KEYS]):
+                d = dict(row).copy()
+                d.update(info)
+                d.update(zip(UNGROUP_KEYS, keys))
+                del d["INFO"]
+                out.append(d)
+        else:
             d = dict(row).copy()
             d.update(info)
-            d.update(zip(UNGROUP_KEYS, keys))
             del d["INFO"]
             out.append(d)
 
-
     out = pd.DataFrame(out) 
-
+    print out.head()
     print_cols = []
     for ix, col in config_df.iterrows():
-        if col["formatter"] in formatter_mgr.formatters:
+        if col.get("default-value", None) not in [None, np.nan]:
+            out[col["col"]] = col["default-value"]
+            print_cols.append(col["col"])
+        elif col["formatter"] in formatter_mgr.formatters:
             kwargs = col.get("options", {})
             columns = formatter_mgr.get_columns(col["formatter"])(**kwargs)
             print_cols.extend(columns)
