@@ -89,6 +89,7 @@ class FormatterManager(object):
         # this is the SNPEFF field, parse it appropriately
         #NON_SYNONYMOUS_CODING(MODERATE|MISSENSE|Gtt/Att|V5I|293|HNRNPCL1||CODING|NM_001013631.1|2|1),
         #MODERATE|MISSENSE|cGc/cCc|R1113P|1159|INPP5D||CODING|NM_005541.3|25|1|WARNING_TRANSCRIPT_INCOMPLETE
+
         EFF_LIST = []
         for effect in value.split(","):
             EFF = {}    
@@ -202,7 +203,7 @@ if __name__ == '__main__':
     parser.add_argument("in_vcf", help="Input VCF file to process")
     parser.add_argument("out_tab", help="Output tab-delimited file")
     parser.add_argument("config", help="config.yaml file")
-    parser.add_argument("--defaults", metavar="[key=value][,key2=value[,..]]", nargs="+", help="Default values for arg-name keys to add as columns in output", default=None)
+    parser.add_argument("--defaults", nargs="+", help="Default values for arg-name keys to add as columns in output", default=None)
     args = parser.parse_args()
 
     if args.defaults:
@@ -236,7 +237,7 @@ if __name__ == '__main__':
             del d["INFO"]
             out.append(d)
 
-    out = pd.DataFrame(out) 
+    out = pd.DataFrame(out)
     print_cols = []
     for ix, col in config_df.iterrows():
         if col.get("default-value", None) not in [None, np.nan]:
@@ -247,7 +248,8 @@ if __name__ == '__main__':
             columns = formatter_mgr.get_columns(col["formatter"])(**kwargs)
             print_cols.extend(columns)
         elif col["col"] not in out:
-            continue
+            out[col["col"]] = None
+            print_cols.append(col["col"])
         else:
             print_cols.append(col["col"])
 
