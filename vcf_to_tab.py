@@ -101,7 +101,8 @@ class FormatterManager(object):
                 # clear out any empty fields!
             EFF_LIST.append({k:v for k,v in EFF.iteritems() if v is not ''})
         
-
+        if max_num_effects == "all":
+            max_num_effects = len(EFF_LIST)
         eff_levels = np.array([EFF_LEVELS[eff["e"]] for eff in EFF_LIST])
         eff_argsort = np.argsort(eff_levels)[::-1]
         eff_sorted = np.array(EFF_LIST)[eff_argsort][0:max_num_effects]
