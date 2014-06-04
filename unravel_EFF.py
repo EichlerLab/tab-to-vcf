@@ -2,6 +2,7 @@ import pandas as pd
 from cStringIO import StringIO
 import numpy as np
 import argparse
+import copy
 import operator
 from collections import defaultdict
 EFF_LEVELS = {"SPLICE_SITE_ACCEPTOR": 4, 
@@ -61,19 +62,6 @@ def read_vcf(vcf_filename, columns=None):
     df = pd.read_csv(s, sep="\t",names=columns)
     return df, vcf_header_lines, columns
 
-
-
-def extract_isoforms(info):
-    if info:
-        r = re.search("EFF=([^;]*)", info)
-    else:
-        return []
-    if r:
-        return list(set([i.split("|")[8] for i in r.group(1).split(",")]))
-    else:
-        return []
-
-
 def parse_INFO(info):
     field_list = info.split(";")
     out = {}
@@ -100,9 +88,11 @@ def parse_EFF(value, max_num_effects=1):
         EFF["e"], t = effect.split("(",1)
         try:
             # no optional warning field
-            EFF["c"], EFF["f"], EFF["cc"], EFF["aa"], EFF["g"], _, _, EFF["tx"], EFF["r"], _ = t.split("|")
-        except:
-            EFF["c"], EFF["f"], EFF["cc"], EFF["aa"], EFF["g"], _, _, EFF["tx"], EFF["r"], _, EFF["err"] = t[:-1].split("|") #-1 removes trailing ")"
+            # HIGH||-/-|-177|305|OR4F5||CODING|NM_001005484.1|1|1)
+            EFF["class"], EFF["group"], EFF["cc"], EFF["aa"], _, EFF["g"], _, _, EFF["tx"], EFF["r"], _ = t.split("|", 10)
+        except ValueError:
+            print value
+            raise
             # clear out any empty fields!
         EFF_LIST.append({k:v for k,v in EFF.iteritems() if v is not ''})
     
@@ -116,15 +106,15 @@ def parse_EFF(value, max_num_effects=1):
         if ("aa" not in e) or (e["aa"] not in already_added_changes):
             d = {}
             d["i"] = i
-            d["gene"] = e["g"]
-            d["class"] = e["c"]
-            d["codon"] = e["cc"]
-            d["effect"] = e["e"]
-            d["group"] = e.get("f",None)
-            d["exon"] = e.get("r", None)
-            d["AA"] = e.get("aa",None)
-            d["transcript"] = e.get("tx", None)
-            already_added_changes.append(e.get("aa",None))
+            d["gene"] = e.get("g", "")
+            d["class"] = e.get("class", "")
+            d["codon"] = e.get("cc", "")
+            d["effect"] = e.get("e","")
+            d["group"] = e.get("group","")
+            d["exon"] = e.get("r", "")
+            d["AA"] = e.get("aa","")
+            d["transcript"] = e.get("tx", "")
+            already_added_changes.append(e.get("aa",""))
             i += 1
             out.append(d)
     return out
@@ -141,7 +131,7 @@ def format_info(info_d, order="alphabetical"):
         v = info_d[k]
         if k == "EFF":
             # format EFF field based on dictionary
-            out += ["EFF={effect}({class}|{group}|{AA}|{gene}|||{transcript}|{exon}||)".format(**v)]
+            out += ["EFF={effect}({class}|{group}|{codon}|{AA}||{gene}|||{transcript}|{exon}||)".format(**v)]
         elif type(v) == bool:
             # is a flag
             out += ["%s" % k]
@@ -150,13 +140,17 @@ def format_info(info_d, order="alphabetical"):
             out += ["%s=%s" % (k,v)]
     return ";".join(out)
 
+def write_vcf(filename, df, header_lines, columns):
+    with open(filename, 'w') as out_f:
+        out_f.writelines(header_lines)
+        df[columns].to_csv(out_f, sep="\t", index=False)
+
 if __name__ == '__main__':
     
     parser = argparse.ArgumentParser()
     parser.add_argument("vcf")
     parser.add_argument("outvcf")
     args = parser.parse_args()
-
 
     vcf, header, cols = read_vcf(args.vcf)
     vcf["INFO_d"] = map(parse_INFO, vcf.INFO.values)
@@ -175,10 +169,13 @@ if __name__ == '__main__':
 
     out["INFO"] = map(format_info, out.INFO_d.values)
     del out["INFO_d"]
-    
+
     out = out.rename(columns={"CHROM": "#CHROM"})
     out_cols = ['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO']
-    out[out_cols].to_csv(args.outvcf, sep="\t", index=False)
+    header += '##unravel_EFF.py=<Nik Krumm 2014 nkrumm@uw.edu>\n'
+
+    write_vcf(args.outvcf, out, header, out_cols)
+
 
 
 
