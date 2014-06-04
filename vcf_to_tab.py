@@ -72,6 +72,7 @@ class FormatterManager(object):
         self.columns = {
             "%sEFF" % prefix: self.cols_EFF
         }
+        self.options = {}
 
     def get_formatter(self, name):
         if name in self.formatters:
@@ -89,16 +90,16 @@ class FormatterManager(object):
         # this is the SNPEFF field, parse it appropriately
         #NON_SYNONYMOUS_CODING(MODERATE|MISSENSE|Gtt/Att|V5I|293|HNRNPCL1||CODING|NM_001013631.1|2|1),
         #MODERATE|MISSENSE|cGc/cCc|R1113P|1159|INPP5D||CODING|NM_005541.3|25|1|WARNING_TRANSCRIPT_INCOMPLETE
-
+        #Effect ( Effect_Impact | Functional_Class | Codon_Change | Amino_Acid_Change| Amino_Acid_length | Gene_Name | Transcript_BioType | Gene_Coding | Transcript_ID | Exon_Rank  | Genotype_Number [ | ERRORS | WARNINGS ] 
         EFF_LIST = []
         for effect in value.split(","):
             EFF = {}    
             EFF["e"], t = effect.split("(",1)
             try:
                 # no optional warning field
-                _, EFF["f"], EFF["cc"], EFF["aa"], _, EFF["g"], _, _, EFF["tx"], EFF["r"], _ = t.split("|")
+                _, EFF["f"], EFF["cc"], EFF["aa"], EFF["aa_len"], EFF["g"], _, _, EFF["tx"], EFF["r"], _ = t.split("|")
             except:
-                _, EFF["f"], EFF["cc"], EFF["aa"], _, EFF["g"], _, _, EFF["tx"], EFF["r"], _, EFF["err"] = t[:-1].split("|") #-1 removes trailing ")"
+                _, EFF["f"], EFF["cc"], EFF["aa"], EFF["aa_len"], EFF["g"], _, _, EFF["tx"], EFF["r"], _, EFF["err"] = t[:-1].split("|") #-1 removes trailing ")"
                 # clear out any empty fields!
             EFF_LIST.append({k:v for k,v in EFF.iteritems() if v is not ''})
         
@@ -117,15 +118,22 @@ class FormatterManager(object):
                 d["EFF_%d_group" % i] = e.get("f",None)
                 d["EFF_%d_exon" % i] = e.get("r", None)
                 d["EFF_%d_AA" % i] = e.get("aa",None)
+                d["EFF_%d_AA_len" % i] = e.get("aa_len",None)
                 d["EFF_%d_transcript" % i] = e.get("tx", None)
-                already_added_changes.append(e.get("aa",None))
+                #already_added_changes.append(e.get("aa",None))
                 i += 1
+        if (i-1) > self.options.get("max_num_effects",0):
+            self.options["max_num_effects"] = (i-1)
         return d
 
     def cols_EFF(self, max_num_effects=1):
-        eff_cols = ["EFF_%d_gene","EFF_%d_effect","EFF_%d_group","EFF_%d_AA","EFF_%d_exon","EFF_%d_transcript"]
+        if max_num_effects == "all":
+            mne = self.options.get("max_num_effects", max_num_effects)
+        else:
+            mne = max_num_effects
+        eff_cols = ["EFF_%d_gene","EFF_%d_effect","EFF_%d_group","EFF_%d_AA","EFF_%d_AA_len","EFF_%d_exon","EFF_%d_transcript"]
         eff_out_cols = []
-        for i in range(1, max_num_effects+1):
+        for i in range(1, mne+1):
             eff_out_cols.extend([s % i for s in eff_cols])
         return eff_out_cols
 
@@ -246,6 +254,9 @@ if __name__ == '__main__':
         elif col["formatter"] in formatter_mgr.formatters:
             kwargs = col.get("options", {})
             columns = formatter_mgr.get_columns(col["formatter"])(**kwargs)
+            for c in columns:
+                if c not in out:
+                    out[c] = None
             print_cols.extend(columns)
         elif col["col"] not in out:
             out[col["col"]] = None
