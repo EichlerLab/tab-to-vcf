@@ -109,8 +109,8 @@ class FormatterManager(object):
         d = {}
         for e_ix, e in enumerate(eff_sorted[0:max_num_effects]):
             if ("aa" not in e) or (e["aa"] not in already_added_changes):
-                d["EFF_%d_gene" % i] = e["g"]
-                d["EFF_%d_effect" % i] = e["e"]
+                d["EFF_%d_gene" % i] = e.get("g", None)
+                d["EFF_%d_effect" % i] = e.get("e", None)
                 d["EFF_%d_group" % i] = e.get("f",None)
                 d["EFF_%d_exon" % i] = e.get("r", None)
                 d["EFF_%d_AA" % i] = e.get("aa",None)
