@@ -3,6 +3,7 @@ import argparse
 from cStringIO import StringIO
 import numpy as np
 import yaml
+import re
 
 def read_vcf(vcf_filename, columns=None):
     columns = None
@@ -46,7 +47,8 @@ EFF_LEVELS = {"SPLICE_SITE_ACCEPTOR": 4,
             "UTR_5_PRIME": 1, 
             "UTR_3_PRIME": 1, 
             "REGULATION": 1, 
-            "UPSTREAM": 1, 
+            "SPLICE_SITE_REGION": 1,
+	    "UPSTREAM": 1, 
             "DOWNSTREAM": 1, 
             "GENE": 1, 
             "TRANSCRIPT": 1, 
@@ -147,9 +149,17 @@ def parse_annotations(info_field, config_df, formatter_manager):
             elif flag:
                 out_value = key_config.get("flag", "True")
             elif type(key_config["formatter"]) == str:
-                out_value = eval(key_config["formatter"])(value)
+                try:
+                    out_value = eval(key_config["formatter"])(value)
+                except:
+                    print "Could not convert value", value, " in column: ", key_config["col"]
+                    out_value = ""
             else:
-                out_value = key_config["formatter"](value)
+                try:
+                    out_value = key_config["formatter"](value)
+                except:
+                    print "Could not convert value", value, " in column: ", key_config["col"]
+                    out_value = ""
             if type(out_value) == dict:
                 out.update(out_value)
             else:
@@ -200,6 +210,7 @@ if __name__ == '__main__':
     out = []
     for ix, row in vcf.iterrows():
         info = parse_annotations(row["INFO"], config_df, formatter_mgr)
+
         for keys in zip(*[info[k] for k in UNGROUP_KEYS]):
             d = dict(row).copy()
             d.update(info)
@@ -207,14 +218,19 @@ if __name__ == '__main__':
             del d["INFO"]
             out.append(d)
 
+
+    out = pd.DataFrame(out) 
+
     print_cols = []
     for ix, col in config_df.iterrows():
         if col["formatter"] in formatter_mgr.formatters:
             kwargs = col.get("options", {})
             columns = formatter_mgr.get_columns(col["formatter"])(**kwargs)
             print_cols.extend(columns)
+        elif col["col"] not in out:
+            continue
         else:
             print_cols.append(col["col"])
 
-    out = pd.DataFrame(out)[print_cols]
-    out.to_csv(args.out_tab, sep="\t", index=False)
+    
+    out[print_cols].to_csv(args.out_tab, sep="\t", index=False)

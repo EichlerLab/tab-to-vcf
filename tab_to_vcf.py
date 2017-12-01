@@ -5,25 +5,13 @@ Convert the given tab-delimited document into a VCF 4.1 document for annotation 
 import argparse
 import csv
 import os
+import yaml
 from fastahack import FastaHack
 import vcf
 from vcf.model import _Record
 
 
 TEMPLATE_VCF_FILE = os.path.join(os.path.dirname(__file__), "template-4.1.vcf")
-VCF_TO_FIELDS = (
-    ("#CHROM", "Chrom"),
-    ("POS", "Pos(hg19)"),
-    ("ID", "Unique id"),
-    ("REF", "Ref"),
-    ("ALT", "Allele"),
-    ("QUAL", "QUAL"),
-    ("FILTER", "FILTER")
-)
-CHROMOSOME_INDEX=0
-POSITION_INDEX=1
-REF_INDEX=3
-ALT_INDEX=4
 
 # each pair here represents a REF==>ALT mapping
 # For example, IUPAC "R":
@@ -40,6 +28,13 @@ IUPAC_CODES = {
     "M": {"A":"C", "C":"A"},
 }
 
+
+VCF_COLUMN_ORDER = ["CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER"]
+
+CHROMOSOME_INDEX = 0
+POSITION_INDEX = 1
+REF_INDEX = 3
+ALT_INDEX = 4
 
 def get_sequence(reference_dict, chrom, position):
     position = int(position)
@@ -61,7 +56,7 @@ def gatk_indel_to_vcf(vcf_row, reference_dict):
     21      38877833        1721    GC      G       .       .       .       .
     21      47958429        1722    A       ACTGGTCT        .       .       .       .
 
-    >>> reference_dict = FastaHack("human_1kg_v37.fasta")
+    >>> reference_dict = FastaHack("human_g1k_v37.fasta")
     >>> gatk_indel_to_vcf(['2', 60689253, '1720', '*', '+G', '.', '.', '.', '.'], reference_dict)
     ['2', 60689253, '1720', 'A', 'AG', '.', '.', '.', '.']
     >>> gatk_indel_to_vcf(['21', 38877833, '1721', '*', '-C', '.', '.', '.', '.'], reference_dict)
@@ -106,7 +101,7 @@ def _convert_iupac(vcf_row):
     else:
         return vcf_row
 
-def tab_to_vcf(input_file, output_file, reference_file, convert_iupac=False, info_fields=None):
+def tab_to_vcf(input_file, output_file, reference_file, columns, info_fields, convert_iupac=False):
     """
     Convert tab-delimited file to VCF.
 
@@ -133,8 +128,8 @@ def tab_to_vcf(input_file, output_file, reference_file, convert_iupac=False, inf
                 vcf_writer = vcf.Writer(output_fh, vcf_reader, lineterminator='\n')
 
                 for row in reader:
-                    args = [row.get(tab_field, ".")
-                            for vcf_field, tab_field in VCF_TO_FIELDS]
+                    
+                    args = [row.get(columns.get(f,None), ".") for f in VCF_COLUMN_ORDER]
                     # Convert position to an integer.
                     args[POSITION_INDEX] = int(args[POSITION_INDEX])
 
@@ -148,11 +143,13 @@ def tab_to_vcf(input_file, output_file, reference_file, convert_iupac=False, inf
 
                     # Convert alternate allele scalar to a list.
                     args[ALT_INDEX] = [args[ALT_INDEX]]
+
+                    # Convert info fields
                     if info_fields:
                         INFO = {}
-                        for k,v in info_fields.items():
-                            if k in row:
-                                INFO[v] = row[k]
+                        for vcf_field,tab_field in info_fields.items():
+                            if tab_field in row:
+                                INFO[vcf_field] = row[tab_field]
                     else:
                         INFO = {}
                     # Add empty entries for INFO, FORMAT, and sample_indexes.
@@ -161,23 +158,44 @@ def tab_to_vcf(input_file, output_file, reference_file, convert_iupac=False, inf
                     record = _Record(*args)
                     vcf_writer.write_record(record)
 
+def load_config(config_file):
+    y = yaml.load(open(config_file))
+    return y
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("input_file", help="tab-delimited input")
     parser.add_argument("output_file", help="VCF 4.1 output")
-    parser.add_argument("reference_file", help="reference assembly for variants in a single FASTA file")
+    parser.add_argument("--config", help="config.yaml configuration file", required=False)
+    parser.add_argument("--reference_file", help="reference assembly for variants in a single FASTA file")
     parser.add_argument("--convert-iupac", help="Convert IUPAC codes to alternate allele only", 
         required=False, default=False, action="store_true")
     parser.add_argument("--info-fields", help="input:ouput (comma separated) mapping for INFO field", 
         required=False, default=None)
-    
-    args = parser.parse_args()
-    if args.info_fields:
-        INFO_FIELDS = {}
-        mapping = args.info_fields.split(",")
-        for m in mapping:
-            k,v = m.strip(" ").split(":")
-            INFO_FIELDS[k] = v
 
-    tab_to_vcf(args.input_file, args.output_file, args.reference_file, convert_iupac=args.convert_iupac, info_fields=INFO_FIELDS)
+    args = parser.parse_args()
+    if args.config:
+        config = load_config(args.config)
+        args.convert_iupac = config["format"]["convert_iupac"]
+        args.reference_file = config["format"]["reference"]
+        COLUMNS = config["columns"]
+        INFO = config["info"]
+    else:
+        COLUMNS = {
+            "CHROM": "Chrom",
+            "POS": "Pos(hg19)",
+            "ID": "Unique id",
+            "REF": "Ref",
+            "ALT": "Allele",
+            "QUAL": "QUAL",
+            "FILTER": "FILTER",
+        }
+        if args.info_fields:
+            INFO_FIELDS = {}
+            mapping = args.info_fields.split(",")
+            for m in mapping:
+                k,v = m.strip(" ").split(":")
+                INFO_FIELDS[v] = k
+
+    tab_to_vcf(args.input_file, args.output_file, args.reference_file, columns=COLUMNS, info_fields=INFO,
+        convert_iupac=args.convert_iupac)
